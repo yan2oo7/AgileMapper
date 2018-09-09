@@ -45,9 +45,11 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
     internal static partial class FastExpressionCompiler
     {
 #if !FEATURE_FAST_COMPILE
-        public static Func<R> CompileFast<R>(this Expression<Func<R>> lambdaExpr) => lambdaExpr.Compile();
+        public static Func<TR> CompileFast<TR>(this Expression<Func<TR>> lambdaExpr) => lambdaExpr.Compile();
 
-        public static Func<T1, R> CompileFast<T1, R>(this Expression<Func<T1, R>> lambdaExpr) => lambdaExpr.Compile();
+        public static Func<T, TR> CompileFast<T, TR>(this Expression<Func<T, TR>> lambdaExpr) => lambdaExpr.Compile();
+
+        public static Func<T1, T2, TR> CompileFast<T1, T2, TR>(this Expression<Func<T1, T2, TR>> lambdaExpr) => lambdaExpr.Compile();
 
         public static TDelegate CompileFast<TDelegate>(this Expression<TDelegate> lambdaExpr)
             where TDelegate : class
@@ -96,70 +98,56 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
             return ((LambdaExpression)lambdaExpr).CompileFast<TDelegate>(ifFastFailedReturnNull);
         }
 
-        /// <summary>Compiles lambda expression to delegate. Use ifFastFailedReturnNull parameter to Not fallback to Expression.Compile, useful for testing.</summary>
-        public static Func<R> CompileFast<R>(this Expression<Func<R>> lambdaExpr, bool ifFastFailedReturnNull = false)
+        public static Func<TR> CompileFast<TR>(this Expression<Func<TR>> lambdaExpr)
         {
-            return TryCompile<Func<R>>(
+            return TryCompile<Func<TR>>(
                    lambdaExpr.Body,
                    lambdaExpr.Parameters,
                    Tools.Empty<Type>(),
-                   typeof(R))
-                ?? (ifFastFailedReturnNull ? null : lambdaExpr.CompileSys());
+                   typeof(TR))
+                ?? lambdaExpr.CompileSys();
         }
 
-        /// <summary>Compiles lambda expression to delegate. Use ifFastFailedReturnNull parameter to Not fallback to Expression.Compile, useful for testing.</summary>
-        public static Func<T1, R> CompileFast<T1, R>(this Expression<Func<T1, R>> lambdaExpr, bool ifFastFailedReturnNull = false)
+        public static Func<T, TR> CompileFast<T, TR>(this Expression<Func<T, TR>> lambdaExpr)
         {
-            return TryCompile<Func<T1, R>>(
+            return TryCompile<Func<T, TR>>(
                     lambdaExpr.Body,
                    lambdaExpr.Parameters,
-                   new[] { typeof(T1) },
-                   typeof(R))
-                   ?? (ifFastFailedReturnNull ? null : lambdaExpr.CompileSys());
+                   new[] { typeof(T) },
+                   typeof(TR))
+                   ?? lambdaExpr.CompileSys();
         }
 
-        /// <summary>Compiles lambda expression to TDelegate type. Use ifFastFailedReturnNull parameter to Not fallback to Expression.Compile, useful for testing.</summary>
-        public static Func<T1, T2, R> CompileFast<T1, T2, R>(this Expression<Func<T1, T2, R>> lambdaExpr,
-            bool ifFastFailedReturnNull = false)
+        public static Func<T1, T2, TR> CompileFast<T1, T2, TR>(this Expression<Func<T1, T2, TR>> lambdaExpr)
         {
-            return TryCompile<Func<T1, T2, R>>(
+            return TryCompile<Func<T1, T2, TR>>(
                    lambdaExpr.Body,
                    lambdaExpr.Parameters,
                    new[] { typeof(T1), typeof(T2) },
-                   typeof(R))
-                   ?? (ifFastFailedReturnNull ? null : lambdaExpr.CompileSys());
-            ;
+                   typeof(TR))
+                   ?? lambdaExpr.CompileSys();
         }
 
-
-        /// <summary>Compiles lambda expression to delegate. Use ifFastFailedReturnNull parameter to Not fallback to Expression.Compile, useful for testing.</summary>
-        public static Func<T1, T2, T3, R> CompileFast<T1, T2, T3, R>(
-            this Expression<Func<T1, T2, T3, R>> lambdaExpr,
-            bool ifFastFailedReturnNull = false)
+        public static Func<T1, T2, T3, TR> CompileFast<T1, T2, T3, TR>(this Expression<Func<T1, T2, T3, TR>> lambdaExpr)
         {
-            return TryCompile<Func<T1, T2, T3, R>>(
+            return TryCompile<Func<T1, T2, T3, TR>>(
                lambdaExpr.Body,
                lambdaExpr.Parameters,
-               new[] { typeof(T1), typeof(T2), typeof(T3) }, typeof(R))
-                ?? (ifFastFailedReturnNull ? null : lambdaExpr.CompileSys());
+               new[] { typeof(T1), typeof(T2), typeof(T3) },
+               typeof(TR))
+                ?? lambdaExpr.CompileSys();
         }
 
-
-        /// <summary>Compiles lambda expression to TDelegate type. Use ifFastFailedReturnNull parameter to Not fallback to Expression.Compile, useful for testing.</summary>
-        public static Func<T1, T2, T3, T4, R> CompileFast<T1, T2, T3, T4, R>(
-            this Expression<Func<T1, T2, T3, T4, R>> lambdaExpr,
-            bool ifFastFailedReturnNull = false)
+        public static Func<T1, T2, T3, T4, TR> CompileFast<T1, T2, T3, T4, TR>(this Expression<Func<T1, T2, T3, T4, TR>> lambdaExpr)
         {
-            return TryCompile<Func<T1, T2, T3, T4, R>>(
-                    lambdaExpr.Body,
+            return TryCompile<Func<T1, T2, T3, T4, TR>>(
+                   lambdaExpr.Body,
                    lambdaExpr.Parameters,
                    new[] { typeof(T1), typeof(T2), typeof(T3), typeof(T4) },
-                   typeof(R))
-                   ?? (ifFastFailedReturnNull ? null : lambdaExpr.CompileSys());
+                   typeof(TR))
+                   ?? lambdaExpr.CompileSys();
         }
 
-
-        /// <summary>Compiles lambda expression to delegate. Use ifFastFailedReturnNull parameter to Not fallback to Expression.Compile, useful for testing.</summary>
         public static Func<T1, T2, T3, T4, T5, R> CompileFast<T1, T2, T3, T4, T5, R>(
             this Expression<Func<T1, T2, T3, T4, T5, R>> lambdaExpr, bool ifFastFailedReturnNull = false)
         {

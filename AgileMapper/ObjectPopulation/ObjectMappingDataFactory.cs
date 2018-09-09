@@ -211,7 +211,7 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
                     bridgeParameter,
                     parentParameter);
 
-                return typedForElementLambda.Compile();
+                return typedForElementLambda.CompileFast();
             });
 
             return (IObjectMappingData)typedForElementCaller.Invoke(_bridge, parent);
