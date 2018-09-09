@@ -174,6 +174,7 @@
                 .ValueConverters
                 .GetConversion(customValueLambda.Body, typeof(TTargetValue));
 
+            // FEC throws a CLR detected an invalid program exception trying to compile a TryParse:
             var valueLambda = Lambda<Func<TTargetValue>>(convertedConstantValue);
             var valueFunc = valueLambda.Compile();
             var value = valueFunc.Invoke().ToConstantExpression(typeof(TTargetValue));

@@ -106,7 +106,7 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
             return TryCompile<Func<TR>>(
                    lambdaExpr.Body,
                    lambdaExpr.Parameters,
-                   Tools.Empty<Type>(),
+                   Constants.NoTypeArguments,
                    typeof(TR))
                 ?? lambdaExpr.CompileSys();
         }
@@ -180,7 +180,7 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
             return TryCompile<Action>(
                    lambdaExpr.Body,
                    lambdaExpr.Parameters,
-                   Tools.Empty<Type>(),
+                   Constants.NoTypeArguments,
                    typeof(void))
                    ?? (ifFastFailedReturnNull ? null : lambdaExpr.CompileSys());
         }
@@ -428,8 +428,8 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
 
                     if (j < fixedNestedLambdaCount)
                     {
-                        info.NestedLambdaExprs = info.NestedLambdaExprs.WithLast(nestedNestedLambdaExpr);
-                        info.NestedLambdas = info.NestedLambdas.WithLast(nestedInfo.NestedLambdas[i]);
+                        info.NestedLambdaExprs = info.NestedLambdaExprs.Append(nestedNestedLambdaExpr);
+                        info.NestedLambdas = info.NestedLambdas.Append(nestedInfo.NestedLambdas[i]);
                     }
                 }
             }
@@ -501,9 +501,7 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
             public LambdaExpression[] NestedLambdaExprs;
 
             public int ClosedItemCount
-            {
-                get { return Constants.Length + NonPassedParameters.Length + NestedLambdas.Length; }
-            }
+                => Constants.Length + NonPassedParameters.Length + NestedLambdas.Length;
 
             // FieldInfos are needed to load field of closure object on stack in emitter.
             // It is also an indicator that we use typed Closure object and not an array.
@@ -523,9 +521,9 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
             {
                 IsClosureConstructed = isConstructed;
 
-                NonPassedParameters = Tools.Empty<ParameterExpression>();
-                NestedLambdas = Tools.Empty<NestedLambdaInfo>();
-                NestedLambdaExprs = Tools.Empty<LambdaExpression>();
+                NonPassedParameters = Enumerable<ParameterExpression>.EmptyArray;
+                NestedLambdas = Enumerable<NestedLambdaInfo>.EmptyArray;
+                NestedLambdaExprs = Enumerable<LambdaExpression>.EmptyArray;
                 CurrentBlock = BlockInfo.Empty;
                 Labels = null;
                 LabelCount = 0;
@@ -533,7 +531,7 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                 if (closure == null)
                 {
                     Closure = null;
-                    Constants = Tools.Empty<ConstantExpression>();
+                    Constants = Enumerable<ConstantExpression>.EmptyArray;
                     ClosureType = null;
                     ClosureFields = null;
                 }
@@ -552,7 +550,7 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                 if (Constants.Length == 0 ||
                     Constants.GetFirstIndex(expr) == -1)
                 {
-                    Constants = Constants.WithLast(expr);
+                    Constants = Constants.Append(expr);
                 }
             }
 
@@ -561,7 +559,7 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                 if (NonPassedParameters.Length == 0 ||
                     NonPassedParameters.GetFirstIndex(expr) == -1)
                 {
-                    NonPassedParameters = NonPassedParameters.WithLast(expr);
+                    NonPassedParameters = NonPassedParameters.Append(expr);
                 }
             }
 
@@ -570,7 +568,7 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                 if (NestedLambdaExprs.Length == 0 ||
                     NestedLambdaExprs.GetFirstIndex(lambdaExpr) == -1)
                 {
-                    NestedLambdaExprs = NestedLambdaExprs.WithLast(lambdaExpr);
+                    NestedLambdaExprs = NestedLambdaExprs.Append(lambdaExpr);
                 }
             }
 
@@ -708,7 +706,7 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                 IList<ParameterExpression> blockVarExprs,
                 ILGenerator il)
             {
-                var localVars = Tools.Empty<LocalBuilder>();
+                LocalBuilder[] localVars;
                 if (blockVarExprs.Count != 0)
                 {
                     localVars = new LocalBuilder[blockVarExprs.Count];
@@ -716,6 +714,10 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                     {
                         localVars[i] = il.DeclareLocal(blockVarExprs[i].Type);
                     }
+                }
+                else
+                {
+                    localVars = Enumerable<LocalBuilder>.EmptyArray;
                 }
 
                 CurrentBlock = new BlockInfo(CurrentBlock, blockResultExpr, blockVarExprs, localVars);
@@ -736,6 +738,13 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
 
             public LocalBuilder GetDefinedLocalVarOrDefault(ParameterExpression varParamExpr)
             {
+                Func<ParameterExpression, ParameterExpression, bool> parameterEquator = null;
+
+                if (varParamExpr.IsByRef)
+                {
+                    parameterEquator = (one, two) => (one.Type == two.Type) && (one.Name == two.Name);
+                }
+
                 for (var block = CurrentBlock; !block.IsEmpty; block = block.Parent)
                 {
                     if (block.LocalVars.Length == 0)
@@ -743,7 +752,7 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                         continue;
                     }
 
-                    var varIndex = block.VarExprs.GetFirstIndex(varParamExpr);
+                    var varIndex = block.VarExprs.GetFirstIndex(varParamExpr, parameterEquator);
                     if (varIndex != -1)
                     {
                         return block.LocalVars[varIndex];
@@ -1194,7 +1203,7 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
 
                     case ExpressionType.Block:
                         var blockExpr = (BlockExpression)expr;
-                        closure.PushBlock(blockExpr.Result, blockExpr.Variables, Tools.Empty<LocalBuilder>());
+                        closure.PushBlock(blockExpr.Result, blockExpr.Variables, Enumerable<LocalBuilder>.EmptyArray);
                         if (!TryCollectBoundConstants(ref closure, blockExpr.Expressions, paramExprs))
                         {
                             return false;
@@ -1345,7 +1354,9 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
             return true;
         }
 
-        private static bool TryCollectTryExprConstants(ref ClosureInfo closure, TryExpression tryExpr,
+        private static bool TryCollectTryExprConstants(
+            ref ClosureInfo closure,
+            TryExpression tryExpr,
             IList<ParameterExpression> paramExprs)
         {
             if (!TryCollectBoundConstants(ref closure, tryExpr.Body, paramExprs))
@@ -1361,7 +1372,7 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                 var catchExVar = catchBlock.Variable;
                 if (catchExVar != null)
                 {
-                    closure.PushBlock(catchBody, new[] { catchExVar }, Tools.Empty<LocalBuilder>());
+                    closure.PushBlock(catchBody, new[] { catchExVar }, Enumerable<LocalBuilder>.EmptyArray);
                     if (!TryCollectBoundConstants(ref closure, catchExVar, paramExprs))
                     {
                         return false;
@@ -3828,18 +3839,6 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
             }
         }
 
-        public static T[] AsArray<T>(this IEnumerable<T> xs) => xs as T[] ?? xs.ToArray();
-
-        public static IList<T> AsReadOnlyList<T>(this IEnumerable<T> xs) =>
-            xs as IList<T> ?? xs.ToArray();
-
-        private static class EmptyArray<T>
-        {
-            public static readonly T[] Value = new T[0];
-        }
-
-        public static T[] Empty<T>() => EmptyArray<T>.Value;
-
         public static T[] WithLast<T>(this T[] source, T value)
         {
             if (source == null || source.Length == 0)
@@ -3868,7 +3867,7 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
         {
             if (paramExprs == null || paramExprs.Count == 0)
             {
-                return Empty<Type>();
+                return Constants.NoTypeArguments;
             }
 
             if (paramExprs.Count == 1)
@@ -3923,22 +3922,30 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
             }
         }
 
-        public static int GetFirstIndex<TItems, TItem>(this IList<TItems> source, TItem item)
+        public static int GetFirstIndex<TItems, TItem>(
+            this IList<TItems> source,
+            TItem item,
+            Func<TItems, TItem, bool> equator = null)
         {
             if (source == null || source.Count == 0)
             {
                 return -1;
             }
 
+            if (equator == null)
+            {
+                equator = (one, two) => ReferenceEquals(one, two);
+            }
+
             var count = source.Count;
             if (count == 1)
             {
-                return ReferenceEquals(source[0], item) ? 0 : -1;
+                return equator(source[0], item) ? 0 : -1;
             }
 
             for (var i = 0; i < count; ++i)
             {
-                if (ReferenceEquals(source[i], item))
+                if (equator(source[i], item))
                 {
                     return i;
                 }
@@ -3970,12 +3977,6 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
             return -1;
         }
 
-        public static T GetFirst<T>(this IEnumerable<T> source)
-        {
-            var list = source as IList<T>;
-            return list == null ? source.FirstOrDefault() : list.Count != 0 ? list[0] : default(T);
-        }
-
         public static T GetFirst<T>(this IEnumerable<T> source, Func<T, bool> predicate)
         {
             var arr = source as T[];
@@ -3986,27 +3987,6 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
 
             var index = arr.GetFirstIndex(predicate);
             return index == -1 ? default(T) : arr[index];
-        }
-
-        public static R[] Map<T, R>(this IList<T> source, Func<T, R> project)
-        {
-            if (source == null || source.Count == 0)
-            {
-                return Empty<R>();
-            }
-
-            if (source.Count == 1)
-            {
-                return new[] { project(source[0]) };
-            }
-
-            var result = new R[source.Count];
-            for (var i = 0; i < result.Length; ++i)
-            {
-                result[i] = project(source[i]);
-            }
-
-            return result;
         }
 #endif
     }
