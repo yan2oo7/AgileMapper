@@ -3,6 +3,7 @@ namespace AgileObjects.AgileMapper.Configuration.Inline
     using System;
     using System.Collections.Generic;
     using Api.Configuration;
+    using Extensions.Internal.Compilation;
 #if NET35
     using Microsoft.Scripting.Ast;
 #else
@@ -51,7 +52,7 @@ namespace AgileObjects.AgileMapper.Configuration.Inline
 
             foreach (var configuration in configurations)
             {
-                configuration.Compile().Invoke(configurator);
+                configuration.CompileFast().Invoke(configurator);
             }
 
             return mapperContext;
