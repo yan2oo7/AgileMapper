@@ -4,6 +4,7 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
     using System.Collections.Generic;
     using Caching;
     using Extensions.Internal;
+    using Extensions.Internal.Compilation;
     using MapperKeys;
     using Members;
     using NetStandardPolyfills;
@@ -369,16 +370,17 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
 
             var typedAsCaller = GlobalContext.Instance.Cache.GetOrAdd(typesKey, k =>
             {
-                var mappingDataParameter = Parameters.Create<IObjectMappingData<TSource, TTarget>>("mappingData");
+                var mappingDataParameter = Parameters.Create<IObjectMappingDataUntyped>("mappingData");
                 var isForDerivedTypeParameter = Parameters.Create<bool>("isForDerivedType");
                 var withTypesCall = mappingDataParameter.GetAsCall(isForDerivedTypeParameter, k.SourceType, k.TargetType);
 
                 var withTypesLambda = Expression
-                    .Lambda<Func<IObjectMappingData<TSource, TTarget>, bool, IObjectMappingDataUntyped>>(
+                    .Lambda<Func<IObjectMappingDataUntyped, bool, IObjectMappingDataUntyped>>(
                         withTypesCall,
                         mappingDataParameter,
                         isForDerivedTypeParameter);
 
+                // FEC flips isForDerivedTypeMapping from false to true if use CompileFast():
                 return withTypesLambda.Compile();
             },
             default(HashCodeComparer<SourceAndTargetTypesKey>));

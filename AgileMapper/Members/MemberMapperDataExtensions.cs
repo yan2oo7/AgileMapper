@@ -522,6 +522,15 @@ namespace AgileObjects.AgileMapper.Members
                 return GetAsCall(subject, typeof(IMappingData).GetPublicInstanceMethod("As"), contextTypes);
             }
 
+            if (subject.Type == typeof(IObjectMappingDataUntyped))
+            {
+                return GetAsCall(
+                    subject,
+                    typeof(IObjectMappingDataUntyped).GetPublicInstanceMethod("As"),
+                    contextTypes,
+                    isForDerivedTypeArgument);
+            }
+
             if (isForDerivedTypeArgument == null)
             {
                 isForDerivedTypeArgument = true.ToConstantExpression();
