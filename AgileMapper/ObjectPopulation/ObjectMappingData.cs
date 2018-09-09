@@ -192,7 +192,7 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
                 var getRuntimeTypeLambda = Expression
                     .Lambda<Func<TSource, Type>>(getRuntimeTypeCall, sourceParameter);
 
-                return getRuntimeTypeLambda.Compile();
+                return getRuntimeTypeLambda.CompileFast();
             });
 
             return getRuntimeTypeFunc.Invoke(Source);
@@ -370,12 +370,12 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
 
             var typedAsCaller = GlobalContext.Instance.Cache.GetOrAdd(typesKey, k =>
             {
-                var mappingDataParameter = Parameters.Create<IObjectMappingDataUntyped>("mappingData");
+                var mappingDataParameter = Parameters.Create<IObjectMappingData<TSource, TTarget>>("mappingData");
                 var isForDerivedTypeParameter = Parameters.Create<bool>("isForDerivedType");
                 var withTypesCall = mappingDataParameter.GetAsCall(isForDerivedTypeParameter, k.SourceType, k.TargetType);
 
                 var withTypesLambda = Expression
-                    .Lambda<Func<IObjectMappingDataUntyped, bool, IObjectMappingDataUntyped>>(
+                    .Lambda<Func<IObjectMappingData<TSource, TTarget>, bool, IObjectMappingDataUntyped>>(
                         withTypesCall,
                         mappingDataParameter,
                         isForDerivedTypeParameter);
