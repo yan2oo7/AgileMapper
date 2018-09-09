@@ -380,8 +380,7 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
                         mappingDataParameter,
                         isForDerivedTypeParameter);
 
-                // FEC flips isForDerivedTypeMapping from false to true if use CompileFast():
-                return withTypesLambda.Compile();
+                return withTypesLambda.CompileFast();
             },
             default(HashCodeComparer<SourceAndTargetTypesKey>));
 

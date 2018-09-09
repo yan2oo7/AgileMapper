@@ -459,10 +459,7 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
             public static readonly BlockInfo Empty = new BlockInfo();
             private BlockInfo() { }
 
-            public bool IsEmpty
-            {
-                get { return Parent == null; }
-            }
+            public bool IsEmpty => Parent == null;
 
             public readonly BlockInfo Parent;
             public readonly Expression ResultExpr;
@@ -1925,7 +1922,12 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                         paramIndex += 1; // shift parameter indices by one, because the first one will be closure
                     }
 
-                    var asAddress = (parent == ExpressionType.Call || parent == ExpressionType.MemberAccess) && paramExpr.Type.IsValueType() && !paramExpr.IsByRef;
+                    var asAddress = 
+                        (parent == ExpressionType.Call || parent == ExpressionType.MemberAccess) && 
+                         paramExpr.Type.IsValueType() && 
+                        !paramExpr.Type.IsPrimitive() && 
+                        !paramExpr.IsByRef;
+                    
                     EmitLoadParamArg(il, paramIndex, asAddress);
 
                     if (paramExpr.IsByRef)
