@@ -131,7 +131,7 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
                     childMembersSourceParameter,
                     parentParameter);
 
-                return typedForChildLambda.Compile();
+                return typedForChildLambda.CompileFast();
             },
             default(HashCodeComparer<SourceAndTargetTypesKey>));
 

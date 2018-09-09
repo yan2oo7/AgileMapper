@@ -51,6 +51,9 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
 
         public static Func<T1, T2, TR> CompileFast<T1, T2, TR>(this Expression<Func<T1, T2, TR>> lambdaExpr) => lambdaExpr.Compile();
 
+        public static Func<T1, T2, T3, TR> CompileFast<T1, T2, T3, TR>(this Expression<Func<T1, T2, T3, TR>> lambdaExpr)
+            => lambdaExpr.Compile();
+
         public static TDelegate CompileFast<TDelegate>(this Expression<TDelegate> lambdaExpr)
             where TDelegate : class
         {
