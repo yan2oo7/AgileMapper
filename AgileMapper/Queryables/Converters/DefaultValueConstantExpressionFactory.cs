@@ -3,6 +3,7 @@
     using System;
     using System.Reflection;
     using Extensions.Internal;
+    using Extensions.Internal.Compilation;
     using NetStandardPolyfills;
 #if NET35
     using Microsoft.Scripting.Ast;
@@ -33,7 +34,7 @@
 
                 var getDefaultValueLambda = Expression.Lambda<Func<object>>(getDefaultValueCall);
 
-                return getDefaultValueLambda.Compile();
+                return getDefaultValueLambda.CompileFast();
             });
 
             return getDefaultValueCaller.Invoke();
