@@ -760,42 +760,28 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
 
         public static class Closure
         {
-            internal static readonly MethodInfo[] CreateMethods = typeof(Closure).GetPublicInstanceMethods().ToArray();
+            internal static readonly MethodInfo[] CreateMethods = typeof(Closure).GetPublicStaticMethods().ToArray();
 
-            public static Closure<T1> Create<T1>(T1 v1)
-            {
-                return new Closure<T1>(v1);
-            }
+            public static Closure<T1> Create<T1>(T1 v1) => new Closure<T1>(v1);
 
-            public static Closure<T1, T2> Create<T1, T2>(T1 v1, T2 v2)
-            {
-                return new Closure<T1, T2>(v1, v2);
-            }
+            public static Closure<T1, T2> Create<T1, T2>(T1 v1, T2 v2) => new Closure<T1, T2>(v1, v2);
 
-            public static Closure<T1, T2, T3> Create<T1, T2, T3>(T1 v1, T2 v2, T3 v3)
-            {
-                return new Closure<T1, T2, T3>(v1, v2, v3);
-            }
+            public static Closure<T1, T2, T3> Create<T1, T2, T3>(T1 v1, T2 v2, T3 v3) => new Closure<T1, T2, T3>(v1, v2, v3);
 
             public static Closure<T1, T2, T3, T4> Create<T1, T2, T3, T4>(T1 v1, T2 v2, T3 v3, T4 v4)
-            {
-                return new Closure<T1, T2, T3, T4>(v1, v2, v3, v4);
-            }
+                => new Closure<T1, T2, T3, T4>(v1, v2, v3, v4);
 
-            public static Closure<T1, T2, T3, T4, T5> Create<T1, T2, T3, T4, T5>(T1 v1, T2 v2, T3 v3, T4 v4,
-                T5 v5)
-            {
-                return new Closure<T1, T2, T3, T4, T5>(v1, v2, v3, v4, v5);
-            }
+            public static Closure<T1, T2, T3, T4, T5> Create<T1, T2, T3, T4, T5>(T1 v1, T2 v2, T3 v3, T4 v4, T5 v5)
+                => new Closure<T1, T2, T3, T4, T5>(v1, v2, v3, v4, v5);
 
-            public static Closure<T1, T2, T3, T4, T5, T6> Create<T1, T2, T3, T4, T5, T6>(T1 v1, T2 v2, T3 v3,
-                T4 v4, T5 v5, T6 v6)
+            public static Closure<T1, T2, T3, T4, T5, T6> Create<T1, T2, T3, T4, T5, T6>(
+                T1 v1, T2 v2, T3 v3, T4 v4, T5 v5, T6 v6)
             {
                 return new Closure<T1, T2, T3, T4, T5, T6>(v1, v2, v3, v4, v5, v6);
             }
 
-            public static Closure<T1, T2, T3, T4, T5, T6, T7> Create<T1, T2, T3, T4, T5, T6, T7>(T1 v1, T2 v2,
-                T3 v3, T4 v4, T5 v5, T6 v6, T7 v7)
+            public static Closure<T1, T2, T3, T4, T5, T6, T7> Create<T1, T2, T3, T4, T5, T6, T7>(
+                T1 v1, T2 v2, T3 v3, T4 v4, T5 v5, T6 v6, T7 v7)
             {
                 return new Closure<T1, T2, T3, T4, T5, T6, T7>(v1, v2, v3, v4, v5, v6, v7);
             }
@@ -812,8 +798,7 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                 return new Closure<T1, T2, T3, T4, T5, T6, T7, T8, T9>(v1, v2, v3, v4, v5, v6, v7, v8, v9);
             }
 
-            public static Closure<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> Create<T1, T2, T3, T4, T5, T6, T7, T8, T9,
-                T10>(
+            public static Closure<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> Create<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10>(
                 T1 v1, T2 v2, T3 v3, T4 v4, T5 v5, T6 v6, T7 v7, T8 v8, T9 v9, T10 v10)
             {
                 return new Closure<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10>(v1, v2, v3, v4, v5, v6, v7, v8, v9, v10);
@@ -1922,12 +1907,12 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                         paramIndex += 1; // shift parameter indices by one, because the first one will be closure
                     }
 
-                    var asAddress = 
-                        (parent == ExpressionType.Call || parent == ExpressionType.MemberAccess) && 
-                         paramExpr.Type.IsValueType() && 
-                        !paramExpr.Type.IsPrimitive() && 
+                    var asAddress =
+                        (parent == ExpressionType.Call || parent == ExpressionType.MemberAccess) &&
+                         paramExpr.Type.IsValueType() &&
+                        !paramExpr.Type.IsPrimitive() &&
                         !paramExpr.IsByRef;
-                    
+
                     EmitLoadParamArg(il, paramIndex, asAddress);
 
                     if (paramExpr.IsByRef)

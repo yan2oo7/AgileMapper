@@ -6,6 +6,7 @@
     using System.Reflection;
     using Extensions;
     using Extensions.Internal;
+    using Extensions.Internal.Compilation;
     using NetStandardPolyfills;
     using ReadableExpressions.Extensions;
 #if NET35
@@ -163,7 +164,7 @@
             var getServiceCall = Expression.Call(providerObject, method, _serviceType);
             var getServiceLambda = Expression.Lambda<Func<Type, object>>(getServiceCall, _serviceType);
 
-            return new ConfiguredServiceProvider(getServiceLambda.Compile(), providerObject);
+            return new ConfiguredServiceProvider(getServiceLambda.CompileFast(), providerObject);
         }
 
         private static ConfiguredServiceProvider NamedServiceProviderFor(
@@ -181,7 +182,7 @@
             var getServiceCall = Expression.Call(providerObject, method, _serviceType, _serviceName);
             var getServiceLambda = Expression.Lambda<Func<Type, string, object>>(getServiceCall, _serviceType, _serviceName);
 
-            return new ConfiguredServiceProvider(getServiceLambda.Compile(), providerObject);
+            return new ConfiguredServiceProvider(getServiceLambda.CompileFast(), providerObject);
         }
 
         private static ConfiguredServiceProvider NamedServiceProviderFor(
@@ -203,7 +204,7 @@
             var getServiceCall = Expression.Call(providerObject, method, arguments);
             var getServiceLambda = Expression.Lambda<Func<Type, string, object>>(getServiceCall, _serviceType, _serviceName);
 
-            return new ConfiguredServiceProvider(getServiceLambda.Compile(), providerObject);
+            return new ConfiguredServiceProvider(getServiceLambda.CompileFast(), providerObject);
         }
 
         private static void ThrowIfNoProvidersFound(ICollection<ConfiguredServiceProvider> providers, ConstantExpression providerObject)
