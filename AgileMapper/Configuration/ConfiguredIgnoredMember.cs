@@ -2,6 +2,7 @@ namespace AgileObjects.AgileMapper.Configuration
 {
     using System;
     using DataSources;
+    using Extensions.Internal.Compilation;
     using Members;
     using ReadableExpressions;
 #if NET35
@@ -32,7 +33,7 @@ namespace AgileObjects.AgileMapper.Configuration
             : base(configInfo, QualifiedMember.All)
         {
             _memberFilterLambda = memberFilterLambda.Body;
-            _memberFilter = memberFilterLambda.Compile();
+            _memberFilter = memberFilterLambda.CompileFast();
         }
 
         private ConfiguredIgnoredMember(

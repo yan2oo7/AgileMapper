@@ -1030,65 +1030,47 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
 
         internal static class CurryClosureFuncs
         {
-            public static readonly MethodInfo[] Methods = typeof(CurryClosureFuncs).GetPublicInstanceMethods().ToArray();
+            public static readonly MethodInfo[] Methods = typeof(CurryClosureFuncs).GetPublicStaticMethods().ToArray();
 
-            public static Func<R> Curry<C, R>(Func<C, R> f, C c)
-            {
-                return () => f(c);
-            }
+            public static Func<R> Curry<C, R>(Func<C, R> f, C c) => () => f(c);
 
-            public static Func<T1, R> Curry<C, T1, R>(Func<C, T1, R> f, C c)
-            {
-                return t1 => f(c, t1);
-            }
+            public static Func<T1, R> Curry<C, T1, R>(Func<C, T1, R> f, C c) => t1 => f(c, t1);
 
-            public static Func<T1, T2, R> Curry<C, T1, T2, R>(Func<C, T1, T2, R> f, C c)
-            {
-                return (t1, t2) => f(c, t1, t2);
-            }
+            public static Func<T1, T2, R> Curry<C, T1, T2, R>(Func<C, T1, T2, R> f, C c) => (t1, t2) => f(c, t1, t2);
 
             public static Func<T1, T2, T3, R> Curry<C, T1, T2, T3, R>(Func<C, T1, T2, T3, R> f, C c)
-            {
-                return (t1, t2, t3) => f(c, t1, t2, t3);
-            }
+                => (t1, t2, t3) => f(c, t1, t2, t3);
 
             public static Func<T1, T2, T3, T4, R> Curry<C, T1, T2, T3, T4, R>(Func<C, T1, T2, T3, T4, R> f, C c)
-            {
-                return (t1, t2, t3, t4) => f(c, t1, t2, t3, t4);
-            }
+                => (t1, t2, t3, t4) => f(c, t1, t2, t3, t4);
 
             public static Func<T1, T2, T3, T4, T5, R> Curry<C, T1, T2, T3, T4, T5, R>(Func<C, T1, T2, T3, T4, T5, R> f, C c)
-            {
-                return (t1, t2, t3, t4, t5) => f(c, t1, t2, t3, t4, t5);
-            }
+                => (t1, t2, t3, t4, t5) => f(c, t1, t2, t3, t4, t5);
 
-            public static Func<T1, T2, T3, T4, T5, T6, R>
-                Curry<C, T1, T2, T3, T4, T5, T6, R>(Func<C, T1, T2, T3, T4, T5, T6, R> f, C c)
-            {
-                return (t1, t2, t3, t4, t5, t6) => f(c, t1, t2, t3, t4, t5, t6);
-            }
+            public static Func<T1, T2, T3, T4, T5, T6, R> Curry<C, T1, T2, T3, T4, T5, T6, R>(Func<C, T1, T2, T3, T4, T5, T6, R> f, C c)
+                => (t1, t2, t3, t4, t5, t6) => f(c, t1, t2, t3, t4, t5, t6);
         }
 
         internal static class CurryClosureActions
         {
-            public static readonly MethodInfo[] Methods = typeof(CurryClosureActions).GetNonPublicStaticMethods().ToArray();
+            public static readonly MethodInfo[] Methods = typeof(CurryClosureActions).GetPublicStaticMethods().ToArray();
 
-            internal static Action Curry<C>(Action<C> a, C c) => () => a(c);
+            public static Action Curry<C>(Action<C> a, C c) => () => a(c);
 
-            internal static Action<T1> Curry<C, T1>(Action<C, T1> f, C c) => t1 => f(c, t1);
+            public static Action<T1> Curry<C, T1>(Action<C, T1> f, C c) => t1 => f(c, t1);
 
-            internal static Action<T1, T2> Curry<C, T1, T2>(Action<C, T1, T2> f, C c) => (t1, t2) => f(c, t1, t2);
+            public static Action<T1, T2> Curry<C, T1, T2>(Action<C, T1, T2> f, C c) => (t1, t2) => f(c, t1, t2);
 
-            internal static Action<T1, T2, T3> Curry<C, T1, T2, T3>(Action<C, T1, T2, T3> f, C c)
+            public static Action<T1, T2, T3> Curry<C, T1, T2, T3>(Action<C, T1, T2, T3> f, C c)
                 => (t1, t2, t3) => f(c, t1, t2, t3);
 
-            internal static Action<T1, T2, T3, T4> Curry<C, T1, T2, T3, T4>(Action<C, T1, T2, T3, T4> f, C c)
+            public static Action<T1, T2, T3, T4> Curry<C, T1, T2, T3, T4>(Action<C, T1, T2, T3, T4> f, C c)
                 => (t1, t2, t3, t4) => f(c, t1, t2, t3, t4);
 
-            internal static Action<T1, T2, T3, T4, T5> Curry<C, T1, T2, T3, T4, T5>(Action<C, T1, T2, T3, T4, T5> f, C c)
+            public static Action<T1, T2, T3, T4, T5> Curry<C, T1, T2, T3, T4, T5>(Action<C, T1, T2, T3, T4, T5> f, C c)
                 => (t1, t2, t3, t4, t5) => f(c, t1, t2, t3, t4, t5);
 
-            internal static Action<T1, T2, T3, T4, T5, T6> Curry<C, T1, T2, T3, T4, T5, T6>(Action<C, T1, T2, T3, T4, T5, T6> f, C c)
+            public static Action<T1, T2, T3, T4, T5, T6> Curry<C, T1, T2, T3, T4, T5, T6>(Action<C, T1, T2, T3, T4, T5, T6> f, C c)
                 => (t1, t2, t3, t4, t5, t6) => f(c, t1, t2, t3, t4, t5, t6);
         }
 
@@ -3249,7 +3231,7 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                     OpCodes.Newobj,
                     isNestedArrayClosure
                         ? ArrayClosure.Constructor
-                        : nestedClosureInfo.ClosureType.GetPublicInstanceConstructor());
+                        : nestedClosureInfo.ClosureType.GetPublicInstanceConstructors().First());
 
                 return EmitMethodCall(il, GetCurryClosureMethod(nestedLambda, nestedLambdaInfo.IsAction));
             }
