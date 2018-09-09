@@ -154,7 +154,6 @@
             {
                 return _customValueLambdaInfo;
             }
-
 #if NET35
             var customValueLambda = _customValueLambda.ToDlrExpression();
             const Dlr.ExpressionType CONSTANT = Dlr.ExpressionType.Constant;
@@ -174,7 +173,7 @@
                 .ValueConverters
                 .GetConversion(customValueLambda.Body, typeof(TTargetValue));
 
-            // FEC throws a CLR detected an invalid program exception trying to compile a TryParse:
+            // FEC throws a 'CLR detected an invalid program' exception trying to compile a TryParse:
             var valueLambda = Lambda<Func<TTargetValue>>(convertedConstantValue);
             var valueFunc = valueLambda.Compile();
             var value = valueFunc.Invoke().ToConstantExpression(typeof(TTargetValue));
