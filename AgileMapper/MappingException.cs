@@ -27,6 +27,16 @@
         private static readonly MethodInfo _factoryMethod =
             typeof(MappingException).GetPublicStaticMethod("For");
 
+#if FEATURE_FAST_COMPILE
+        /// <summary>
+        /// Initializes a new instance of the <see cref="MappingException"/> class.
+        /// </summary>
+        public MappingException()
+            : base("An exception occurred during mapping")
+        {
+        }
+#endif
+
         #region Serialization Support
 #if FEATURE_SERIALIZATION
         /// <summary>

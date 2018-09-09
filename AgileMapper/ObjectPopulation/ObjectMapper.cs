@@ -32,7 +32,7 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
 
             if (MapperData.Context.Compile)
             {
-                _mapperFunc = mappingLambda.Compile();
+                _mapperFunc = mappingLambda.CompileFast();
             }
             else if (MapperData.Context.NeedsSubMapping)
             {

@@ -62,8 +62,7 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
 #else
         #region Expression.CompileFast overloads for Delegate, Funcs, and Actions
 
-        /// <summary>Compiles lambda expression to TDelegate type. Use ifFastFailedReturnNull parameter to Not fallback to Expression.Compile, useful for testing.</summary>
-        public static TDelegate CompileFast<TDelegate>(this LambdaExpression lambdaExpr, bool ifFastFailedReturnNull = false)
+        public static TDelegate CompileFast<TDelegate>(this LambdaExpression lambdaExpr)
             where TDelegate : class
         {
             return TryCompile<TDelegate>(
@@ -71,18 +70,12 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                        lambdaExpr.Parameters,
                        Tools.GetParamTypes(lambdaExpr.Parameters),
                        lambdaExpr.ReturnType)
-                   ?? (ifFastFailedReturnNull
-                       ? null
-                       : (TDelegate)(object)lambdaExpr
+                   ?? (TDelegate)(object)lambdaExpr
 #if LIGHT_EXPRESSION
-                .ToLambdaExpression()
+                       .ToLambdaExpression()
 #endif
-                           .Compile());
+                       .Compile();
         }
-
-        /// <summary>Compiles lambda expression to delegate. Use ifFastFailedReturnNull parameter to Not fallback to Expression.Compile, useful for testing.</summary>
-        public static Delegate CompileFast(this LambdaExpression lambdaExpr, bool ifFastFailedReturnNull = false)
-            => lambdaExpr.CompileFast<Delegate>(ifFastFailedReturnNull);
 
         private static TDelegate CompileSys<TDelegate>(this Expression<TDelegate> lambdaExpr)
             where TDelegate : class
@@ -94,11 +87,10 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                 .Compile();
         }
 
-        /// <summary>Compiles lambda expression to TDelegate type. Use ifFastFailedReturnNull parameter to Not fallback to Expression.Compile, useful for testing.</summary>
-        public static TDelegate CompileFast<TDelegate>(this Expression<TDelegate> lambdaExpr, bool ifFastFailedReturnNull = false)
+        public static TDelegate CompileFast<TDelegate>(this Expression<TDelegate> lambdaExpr)
             where TDelegate : class
         {
-            return ((LambdaExpression)lambdaExpr).CompileFast<TDelegate>(ifFastFailedReturnNull);
+            return ((LambdaExpression)lambdaExpr).CompileFast<TDelegate>();
         }
 
         public static Func<TR> CompileFast<TR>(this Expression<Func<TR>> lambdaExpr)
@@ -141,147 +133,7 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                 ?? lambdaExpr.CompileSys();
         }
 
-        public static Func<T1, T2, T3, T4, TR> CompileFast<T1, T2, T3, T4, TR>(this Expression<Func<T1, T2, T3, T4, TR>> lambdaExpr)
-        {
-            return TryCompile<Func<T1, T2, T3, T4, TR>>(
-                   lambdaExpr.Body,
-                   lambdaExpr.Parameters,
-                   new[] { typeof(T1), typeof(T2), typeof(T3), typeof(T4) },
-                   typeof(TR))
-                   ?? lambdaExpr.CompileSys();
-        }
-
-        public static Func<T1, T2, T3, T4, T5, R> CompileFast<T1, T2, T3, T4, T5, R>(
-            this Expression<Func<T1, T2, T3, T4, T5, R>> lambdaExpr, bool ifFastFailedReturnNull = false)
-        {
-            return TryCompile<Func<T1, T2, T3, T4, T5, R>>(
-                   lambdaExpr.Body,
-                   lambdaExpr.Parameters,
-                   new[] { typeof(T1), typeof(T2), typeof(T3), typeof(T4), typeof(T5) },
-                   typeof(R))
-                   ?? (ifFastFailedReturnNull ? null : lambdaExpr.CompileSys());
-        }
-
-        /// <summary>Compiles lambda expression to delegate. Use ifFastFailedReturnNull parameter to Not fallback to Expression.Compile, useful for testing.</summary>
-        public static Func<T1, T2, T3, T4, T5, T6, R> CompileFast<T1, T2, T3, T4, T5, T6, R>(
-            this Expression<Func<T1, T2, T3, T4, T5, T6, R>> lambdaExpr, bool ifFastFailedReturnNull = false)
-        {
-            return TryCompile<Func<T1, T2, T3, T4, T5, T6, R>>(
-                   lambdaExpr.Body,
-                   lambdaExpr.Parameters,
-                   new[] { typeof(T1), typeof(T2), typeof(T3), typeof(T4), typeof(T5), typeof(T6) },
-                   typeof(R))
-                   ?? (ifFastFailedReturnNull ? null : lambdaExpr.CompileSys());
-        }
-
-        /// <summary>Compiles lambda expression to delegate. Use ifFastFailedReturnNull parameter to Not fallback to Expression.Compile, useful for testing.</summary>
-        public static Action CompileFast(this Expression<Action> lambdaExpr, bool ifFastFailedReturnNull = false)
-        {
-            return TryCompile<Action>(
-                   lambdaExpr.Body,
-                   lambdaExpr.Parameters,
-                   Constants.NoTypeArguments,
-                   typeof(void))
-                   ?? (ifFastFailedReturnNull ? null : lambdaExpr.CompileSys());
-        }
-
-
-        /// <summary>Compiles lambda expression to delegate. Use ifFastFailedReturnNull parameter to Not fallback to Expression.Compile, useful for testing.</summary>
-        public static Action<T1> CompileFast<T1>(
-            this Expression<Action<T1>> lambdaExpr,
-            bool ifFastFailedReturnNull = false)
-        {
-            return TryCompile<Action<T1>>(
-                    lambdaExpr.Body,
-                   lambdaExpr.Parameters,
-                   new[] { typeof(T1) },
-                   typeof(void))
-                   ?? (ifFastFailedReturnNull ? null : lambdaExpr.CompileSys());
-        }
-
-        /// <summary>Compiles lambda expression to delegate. Use ifFastFailedReturnNull parameter to Not fallback to Expression.Compile, useful for testing.</summary>
-        public static Action<T1, T2> CompileFast<T1, T2>(
-            this Expression<Action<T1, T2>> lambdaExpr,
-            bool ifFastFailedReturnNull = false)
-        {
-            return TryCompile<Action<T1, T2>>(
-                   lambdaExpr.Body,
-                   lambdaExpr.Parameters,
-                   new[] { typeof(T1), typeof(T2) },
-                   typeof(void))
-                   ?? (ifFastFailedReturnNull ? null : lambdaExpr.CompileSys());
-        }
-
-        /// <summary>Compiles lambda expression to delegate. Use ifFastFailedReturnNull parameter to Not fallback to Expression.Compile, useful for testing.</summary>
-        public static Action<T1, T2, T3> CompileFast<T1, T2, T3>(
-            this Expression<Action<T1, T2, T3>> lambdaExpr,
-            bool ifFastFailedReturnNull = false)
-        {
-            return TryCompile<Action<T1, T2, T3>>(lambdaExpr.Body, lambdaExpr.Parameters,
-                       new[] { typeof(T1), typeof(T2), typeof(T3) }, typeof(void))
-                   ?? (ifFastFailedReturnNull ? null : lambdaExpr.CompileSys());
-        }
-
-        /// <summary>Compiles lambda expression to delegate. Use ifFastFailedReturnNull parameter to Not fallback to Expression.Compile, useful for testing.</summary>
-        public static Action<T1, T2, T3, T4> CompileFast<T1, T2, T3, T4>(
-            this Expression<Action<T1, T2, T3, T4>> lambdaExpr, bool ifFastFailedReturnNull = false)
-        {
-            return TryCompile<Action<T1, T2, T3, T4>>(lambdaExpr.Body, lambdaExpr.Parameters,
-                       new[] { typeof(T1), typeof(T2), typeof(T3), typeof(T4) }, typeof(void))
-                   ?? (ifFastFailedReturnNull ? null : lambdaExpr.CompileSys());
-        }
-
-        /// <summary>Compiles lambda expression to delegate. Use ifFastFailedReturnNull parameter to Not fallback to Expression.Compile, useful for testing.</summary>
-        public static Action<T1, T2, T3, T4, T5> CompileFast<T1, T2, T3, T4, T5>(
-            this Expression<Action<T1, T2, T3, T4, T5>> lambdaExpr, bool ifFastFailedReturnNull = false)
-        {
-            return TryCompile<Action<T1, T2, T3, T4, T5>>(lambdaExpr.Body, lambdaExpr.Parameters,
-                       new[] { typeof(T1), typeof(T2), typeof(T3), typeof(T4), typeof(T5) }, typeof(void))
-                   ?? (ifFastFailedReturnNull ? null : lambdaExpr.CompileSys());
-        }
-
-        /// <summary>Compiles lambda expression to delegate. Use ifFastFailedReturnNull parameter to Not fallback to Expression.Compile, useful for testing.</summary>
-        public static Action<T1, T2, T3, T4, T5, T6> CompileFast<T1, T2, T3, T4, T5, T6>(
-            this Expression<Action<T1, T2, T3, T4, T5, T6>> lambdaExpr, bool ifFastFailedReturnNull = false)
-        {
-            return TryCompile<Action<T1, T2, T3, T4, T5, T6>>(lambdaExpr.Body, lambdaExpr.Parameters,
-                       new[] { typeof(T1), typeof(T2), typeof(T3), typeof(T4), typeof(T5), typeof(T6) }, typeof(void))
-                   ?? (ifFastFailedReturnNull ? null : lambdaExpr.CompileSys());
-        }
-
         #endregion
-
-        /// <summary>Tries to compile lambda expression to <typeparamref name="TDelegate"/></summary>
-        public static TDelegate TryCompile<TDelegate>(this LambdaExpression lambdaExpr) where TDelegate : class
-        {
-            return TryCompile<TDelegate>(lambdaExpr.Body, lambdaExpr.Parameters,
-                Tools.GetParamTypes(lambdaExpr.Parameters),
-                lambdaExpr.ReturnType);
-        }
-
-        /// <summary>Tries to compile lambda expression to <typeparamref name="TDelegate"/> 
-        /// with the provided closure object and constant expressions (or lack there of) -
-        /// Constant expression should be the in order of Fields in closure object!
-        /// Note 1: Use it on your own risk - FEC won't verify the expression is compile-able with passed closure, it is up to you!
-        /// Note 2: The expression with NESTED LAMBDA IS NOT SUPPORTED!</summary>
-        public static TDelegate TryCompileWithPreCreatedClosure<TDelegate>(this LambdaExpression lambdaExpr,
-            object closure, params ConstantExpression[] closureConstantsExprs)
-            where TDelegate : class
-        {
-            var closureInfo = new ClosureInfo(true, closure, closureConstantsExprs);
-            var bodyExpr = lambdaExpr.Body;
-            var returnType = bodyExpr.Type;
-            var paramExprs = lambdaExpr.Parameters;
-            return (TDelegate)TryCompile(ref closureInfo, typeof(TDelegate), Tools.GetParamTypes(paramExprs),
-                returnType, bodyExpr, returnType, paramExprs);
-        }
-
-        /// <summary>Tries to compile expression to "static" delegate, skipping the step of collecting the closure object.</summary>
-        public static TDelegate TryCompileWithoutClosure<TDelegate>(this LambdaExpression lambdaExpr)
-            where TDelegate : class
-        {
-            return lambdaExpr.TryCompileWithPreCreatedClosure<TDelegate>(null, null);
-        }
 
         /// <summary>Compiles expression to delegate by emitting the IL. 
         /// If sub-expressions are not supported by emitter, then the method returns null.
@@ -378,8 +230,10 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
             return method.CreateDelegate(delegateType, closureObject);
         }
 
-        private static void CopyNestedClosureInfo(IList<ParameterExpression> lambdaParamExprs,
-            ref ClosureInfo info, ref ClosureInfo nestedInfo)
+        private static void CopyNestedClosureInfo(
+            IList<ParameterExpression> lambdaParamExprs,
+            ref ClosureInfo info,
+            ref ClosureInfo nestedInfo)
         {
             // if nested non passed parameter is no matched with any outer passed parameter, 
             // then ensure it goes to outer non passed parameter.
@@ -738,13 +592,6 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
 
             public LocalBuilder GetDefinedLocalVarOrDefault(ParameterExpression varParamExpr)
             {
-                Func<ParameterExpression, ParameterExpression, bool> parameterEquator = null;
-
-                if (varParamExpr.IsByRef)
-                {
-                    parameterEquator = (one, two) => (one.Type == two.Type) && (one.Name == two.Name);
-                }
-
                 for (var block = CurrentBlock; !block.IsEmpty; block = block.Parent)
                 {
                     if (block.LocalVars.Length == 0)
@@ -752,7 +599,7 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                         continue;
                     }
 
-                    var varIndex = block.VarExprs.GetFirstIndex(varParamExpr, parameterEquator);
+                    var varIndex = block.VarExprs.GetFirstIndex(varParamExpr);
                     if (varIndex != -1)
                     {
                         return block.LocalVars[varIndex];
@@ -769,7 +616,7 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
 
         public static class Closure
         {
-            internal static readonly MethodInfo[] CreateMethods = typeof(Closure).GetPublicStaticMethods().ToArray();
+            internal static readonly MethodInfo[] CreateMethods = typeof(Closure).GetPublicStaticMethods("Create").ToArray();
 
             public static Closure<T1> Create<T1>(T1 v1) => new Closure<T1>(v1);
 
@@ -1039,7 +886,7 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
 
         internal static class CurryClosureFuncs
         {
-            public static readonly MethodInfo[] Methods = typeof(CurryClosureFuncs).GetPublicStaticMethods().ToArray();
+            public static readonly MethodInfo[] Methods = typeof(CurryClosureFuncs).GetPublicStaticMethods("Curry").ToArray();
 
             public static Func<R> Curry<C, R>(Func<C, R> f, C c) => () => f(c);
 
@@ -1062,7 +909,7 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
 
         internal static class CurryClosureActions
         {
-            public static readonly MethodInfo[] Methods = typeof(CurryClosureActions).GetPublicStaticMethods().ToArray();
+            public static readonly MethodInfo[] Methods = typeof(CurryClosureActions).GetPublicStaticMethods("Curry").ToArray();
 
             public static Action Curry<C>(Action<C> a, C c) => () => a(c);
 
@@ -1192,7 +1039,7 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                             return false;
                         }
 
-                        if (condExpr.IfFalse != null &&
+                        if ((condExpr.IfFalse.NodeType != ExpressionType.Default) &&
                             !TryCollectBoundConstants(ref closure, condExpr.IfFalse, paramExprs))
                         {
                             return false;
@@ -3922,30 +3769,22 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
             }
         }
 
-        public static int GetFirstIndex<TItems, TItem>(
-            this IList<TItems> source,
-            TItem item,
-            Func<TItems, TItem, bool> equator = null)
+        public static int GetFirstIndex<TItems, TItem>(this IList<TItems> source, TItem item)
         {
             if (source == null || source.Count == 0)
             {
                 return -1;
             }
 
-            if (equator == null)
-            {
-                equator = (one, two) => ReferenceEquals(one, two);
-            }
-
             var count = source.Count;
             if (count == 1)
             {
-                return equator(source[0], item) ? 0 : -1;
+                return ReferenceEquals(source[0], item) ? 0 : -1;
             }
 
             for (var i = 0; i < count; ++i)
             {
-                if (equator(source[i], item))
+                if (ReferenceEquals(source[i], item))
                 {
                     return i;
                 }
