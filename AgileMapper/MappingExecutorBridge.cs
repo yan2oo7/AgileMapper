@@ -6,6 +6,7 @@
     using Api;
     using Caching;
     using Extensions.Internal;
+    using Extensions.Internal.Compilation;
     using NetStandardPolyfills;
 #if NET35
     using Microsoft.Scripting.Ast;
@@ -37,7 +38,7 @@
                     typedCreateNewCall,
                     _selectorParameter);
 
-                return createNewCaller.Compile();
+                return createNewCaller.CompileFast();
             });
 
             return typedCaller.Invoke(selector);
