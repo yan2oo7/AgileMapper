@@ -1,6 +1,7 @@
 namespace AgileObjects.AgileMapper.ObjectPopulation.RepeatedMappings
 {
     using System;
+    using Extensions.Internal.Compilation;
     using Members;
 #if NET35
     using Microsoft.Scripting.Ast;
@@ -70,7 +71,7 @@ namespace AgileObjects.AgileMapper.ObjectPopulation.RepeatedMappings
             MappingLambda = mappingData.GetOrCreateMapper().MappingLambda;
 
             var typedMappingLambda = (Expression<MapperFunc<TChildSource, TChildTarget>>)MappingLambda;
-            _repeatedMappingFunc = typedMappingLambda.Compile();
+            _repeatedMappingFunc = typedMappingLambda.CompileFast();
 
             if (isLazyLoading)
             {
