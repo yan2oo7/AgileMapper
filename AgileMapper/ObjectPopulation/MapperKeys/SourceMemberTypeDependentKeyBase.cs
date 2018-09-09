@@ -4,6 +4,7 @@ namespace AgileObjects.AgileMapper.ObjectPopulation.MapperKeys
     using System.Linq;
     using Extensions;
     using Extensions.Internal;
+    using Extensions.Internal.Compilation;
     using Members;
 #if NET35
     using Microsoft.Scripting.Ast;
@@ -50,7 +51,7 @@ namespace AgileObjects.AgileMapper.ObjectPopulation.MapperKeys
             var mappingDataParameter = typeof(IMappingData).GetOrCreateParameter();
             var typeTestLambda = Expression.Lambda<Func<IMappingData, bool>>(typeTest, mappingDataParameter);
 
-            _sourceMemberTypeTester = typeTestLambda.Compile();
+            _sourceMemberTypeTester = typeTestLambda.CompileFast();
             HasTypeTester = true;
         }
 
