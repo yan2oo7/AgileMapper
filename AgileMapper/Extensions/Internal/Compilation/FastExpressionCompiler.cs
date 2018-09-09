@@ -1460,7 +1460,7 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
 
                 if (expr.Indexer != null)
                 {
-                    return EmitMethodCall(il, TryGetPropertyGetMethod(expr.Indexer));
+                    return EmitMethodCall(il, expr.Indexer.GetGetter());
                 }
 
                 if (expr.Arguments.Count == 1) // one dimensional array
@@ -2393,20 +2393,17 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
 
             private static bool EmitMemberAssign(ILGenerator il, MemberInfo member)
             {
-                var prop = member as PropertyInfo;
-                if (prop != null)
+                switch (member)
                 {
-                    return EmitMethodCall(il, prop.DeclaringType.GetPublicInstanceMethod("set_" + prop.Name));
+                    case PropertyInfo prop:
+                        return EmitMethodCall(il, prop.GetSetter());
+
+                    case FieldInfo field:
+                        il.Emit(OpCodes.Stfld, field);
+                        return true;
                 }
 
-                var field = member as FieldInfo;
-                if (field == null)
-                {
-                    return false;
-                }
-
-                il.Emit(OpCodes.Stfld, field);
-                return true;
+                return false;
             }
 
             private static bool TryEmitIncDecAssign(UnaryExpression expr, ILGenerator il, ref ClosureInfo closure, ExpressionType parent)
@@ -2888,11 +2885,10 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                         StoreAsVarAndLoadItsAddress(il, instanceExpr.Type);
                     }
 
-                    return EmitMethodCall(il, TryGetPropertyGetMethod(prop));
+                    return EmitMethodCall(il, prop.GetGetter());
                 }
 
-                var field = expr.Member as FieldInfo;
-                if (field != null)
+                if (expr.Member is FieldInfo field)
                 {
                     il.Emit(field.IsStatic ? OpCodes.Ldsfld : OpCodes.Ldfld, field);
                     return true;
@@ -2900,9 +2896,6 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
 
                 return false;
             }
-
-            private static MethodInfo TryGetPropertyGetMethod(PropertyInfo prop)
-                => prop.DeclaringType.GetPublicInstanceMethod("get_" + prop.Name);
 
             // ReSharper disable once FunctionComplexityOverflow
             private static bool TryEmitNestedLambda(LambdaExpression lambdaExpr,
