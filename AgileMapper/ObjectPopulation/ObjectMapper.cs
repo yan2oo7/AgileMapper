@@ -4,6 +4,7 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
     using System.Collections.Generic;
     using System.Linq;
     using Caching;
+    using Extensions.Internal.Compilation;
     using MapperKeys;
     using NetStandardPolyfills;
     using RepeatedMappings;
@@ -82,7 +83,7 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
                         mapperDataParameter,
                         lazyLoadParameter);
 
-                    return mapperCreationLambda.Compile();
+                    return mapperCreationLambda.CompileFast();
                 },
                 default(HashCodeComparer<SourceAndTargetTypesKey>));
 
