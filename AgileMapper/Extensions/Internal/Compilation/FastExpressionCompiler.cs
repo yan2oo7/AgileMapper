@@ -48,6 +48,12 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
         public static Func<R> CompileFast<R>(this Expression<Func<R>> lambdaExpr) => lambdaExpr.Compile();
 
         public static Func<T1, R> CompileFast<T1, R>(this Expression<Func<T1, R>> lambdaExpr) => lambdaExpr.Compile();
+
+        public static TDelegate CompileFast<TDelegate>(this Expression<TDelegate> lambdaExpr)
+            where TDelegate : class
+        {
+            return lambdaExpr.Compile();
+        }
 #else
         #region Expression.CompileFast overloads for Delegate, Funcs, and Actions
 

@@ -6,6 +6,7 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
     using Caching;
     using Enumerables;
     using Extensions.Internal;
+    using Extensions.Internal.Compilation;
     using MapperKeys;
     using Members;
     using Members.Sources;
@@ -421,7 +422,7 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
                     mappingContextParameter,
                     mappingDataParameter);
 
-                return constructionLambda.Compile();
+                return constructionLambda.CompileFast();
             });
 
             return constructionFunc;
