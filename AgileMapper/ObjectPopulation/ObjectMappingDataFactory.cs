@@ -351,7 +351,7 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
                         mappingContextParameter,
                         parentParameter);
 
-                return createLambda.Compile();
+                return createLambda.CompileFast();
             });
 
             return createCallerFunc;
