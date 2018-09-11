@@ -10,6 +10,7 @@
     using DataSources;
     using Extensions;
     using Extensions.Internal;
+    using Extensions.Internal.Compilation;
     using Members;
     using Members.Dictionaries;
     using NetStandardPolyfills;
@@ -175,7 +176,7 @@
 
             // FEC throws a 'CLR detected an invalid program' exception trying to compile a TryParse:
             var valueLambda = Lambda<Func<TTargetValue>>(convertedConstantValue);
-            var valueFunc = valueLambda.Compile();
+            var valueFunc = valueLambda.CompileFast();
             var value = valueFunc.Invoke().ToConstantExpression(typeof(TTargetValue));
             var constantValueLambda = Lambda<Func<TTargetValue>>(value);
             var valueLambdaInfo = ConfiguredLambdaInfo.For(constantValueLambda);
