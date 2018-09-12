@@ -153,7 +153,6 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                 paramTypes,
                 returnType,
                 bodyExpr,
-                bodyExpr.Type,
                 paramExprs);
         }
 
@@ -163,7 +162,6 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
             Type[] paramTypes,
             Type returnType,
             Expression expr,
-            Type exprType,
             IList<ParameterExpression> paramExprs,
             bool isNestedLambda = false)
         {
@@ -209,7 +207,10 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                 typeof(FastExpressionCompiler), skipVisibility: true);
 
             var il = method.GetILGenerator();
-            if (!EmittingVisitor.TryEmit(expr, exprType, paramExprs, il, ref closureInfo, ExpressionType.Default, returnType == typeof(void)))
+
+            var parentFlags = returnType == typeof(void) ? ParentFlags.IgnoreResult : ParentFlags.Empty;
+
+            if (!EmittingVisitor.TryEmit(expr, paramExprs, il, ref closureInfo, parentFlags))
             {
                 return null;
             }
@@ -314,17 +315,13 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
             private BlockInfo() { }
 
             public bool IsEmpty => Parent == null;
-
             public readonly BlockInfo Parent;
-            public readonly Expression ResultExpr;
             public readonly IList<ParameterExpression> VarExprs;
             public readonly LocalBuilder[] LocalVars;
 
-            internal BlockInfo(BlockInfo parent,
-                Expression resultExpr, IList<ParameterExpression> varExprs, LocalBuilder[] localVars)
+            internal BlockInfo(BlockInfo parent, IList<ParameterExpression> varExprs, LocalBuilder[] localVars)
             {
                 Parent = parent;
-                ResultExpr = resultExpr;
                 VarExprs = varExprs;
                 LocalVars = localVars;
             }
@@ -548,15 +545,13 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
             }
 
             public void PushBlock(
-                Expression blockResultExpr,
                 IList<ParameterExpression> blockVarExprs,
                 LocalBuilder[] localVars)
             {
-                CurrentBlock = new BlockInfo(CurrentBlock, blockResultExpr, blockVarExprs, localVars);
+                CurrentBlock = new BlockInfo(CurrentBlock, blockVarExprs, localVars);
             }
 
             public void PushBlockAndConstructLocalVars(
-                Expression blockResultExpr,
                 IList<ParameterExpression> blockVarExprs,
                 ILGenerator il)
             {
@@ -574,7 +569,7 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                     localVars = Enumerable<LocalBuilder>.EmptyArray;
                 }
 
-                CurrentBlock = new BlockInfo(CurrentBlock, blockResultExpr, blockVarExprs, localVars);
+                CurrentBlock = new BlockInfo(CurrentBlock, blockVarExprs, localVars);
             }
 
             public void PopBlock() => CurrentBlock = CurrentBlock.Parent;
@@ -622,43 +617,34 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
 
             public static Closure<T1, T2> Create<T1, T2>(T1 v1, T2 v2) => new Closure<T1, T2>(v1, v2);
 
-            public static Closure<T1, T2, T3> Create<T1, T2, T3>(T1 v1, T2 v2, T3 v3) => new Closure<T1, T2, T3>(v1, v2, v3);
+            public static Closure<T1, T2, T3> Create<T1, T2, T3>(T1 v1, T2 v2, T3 v3) =>
+                new Closure<T1, T2, T3>(v1, v2, v3);
 
-            public static Closure<T1, T2, T3, T4> Create<T1, T2, T3, T4>(T1 v1, T2 v2, T3 v3, T4 v4)
-                => new Closure<T1, T2, T3, T4>(v1, v2, v3, v4);
+            public static Closure<T1, T2, T3, T4> Create<T1, T2, T3, T4>(T1 v1, T2 v2, T3 v3, T4 v4) =>
+                new Closure<T1, T2, T3, T4>(v1, v2, v3, v4);
 
-            public static Closure<T1, T2, T3, T4, T5> Create<T1, T2, T3, T4, T5>(T1 v1, T2 v2, T3 v3, T4 v4, T5 v5)
-                => new Closure<T1, T2, T3, T4, T5>(v1, v2, v3, v4, v5);
+            public static Closure<T1, T2, T3, T4, T5> Create<T1, T2, T3, T4, T5>(T1 v1, T2 v2, T3 v3, T4 v4,
+                T5 v5) => new Closure<T1, T2, T3, T4, T5>(v1, v2, v3, v4, v5);
 
-            public static Closure<T1, T2, T3, T4, T5, T6> Create<T1, T2, T3, T4, T5, T6>(
-                T1 v1, T2 v2, T3 v3, T4 v4, T5 v5, T6 v6)
-            {
-                return new Closure<T1, T2, T3, T4, T5, T6>(v1, v2, v3, v4, v5, v6);
-            }
+            public static Closure<T1, T2, T3, T4, T5, T6> Create<T1, T2, T3, T4, T5, T6>(T1 v1, T2 v2, T3 v3,
+                T4 v4, T5 v5, T6 v6) => new Closure<T1, T2, T3, T4, T5, T6>(v1, v2, v3, v4, v5, v6);
 
-            public static Closure<T1, T2, T3, T4, T5, T6, T7> Create<T1, T2, T3, T4, T5, T6, T7>(
-                T1 v1, T2 v2, T3 v3, T4 v4, T5 v5, T6 v6, T7 v7)
-            {
-                return new Closure<T1, T2, T3, T4, T5, T6, T7>(v1, v2, v3, v4, v5, v6, v7);
-            }
+            public static Closure<T1, T2, T3, T4, T5, T6, T7> Create<T1, T2, T3, T4, T5, T6, T7>(T1 v1, T2 v2,
+                T3 v3, T4 v4, T5 v5, T6 v6, T7 v7) =>
+                new Closure<T1, T2, T3, T4, T5, T6, T7>(v1, v2, v3, v4, v5, v6, v7);
 
             public static Closure<T1, T2, T3, T4, T5, T6, T7, T8> Create<T1, T2, T3, T4, T5, T6, T7, T8>(
-                T1 v1, T2 v2, T3 v3, T4 v4, T5 v5, T6 v6, T7 v7, T8 v8)
-            {
-                return new Closure<T1, T2, T3, T4, T5, T6, T7, T8>(v1, v2, v3, v4, v5, v6, v7, v8);
-            }
+                T1 v1, T2 v2, T3 v3, T4 v4, T5 v5, T6 v6, T7 v7, T8 v8) =>
+                new Closure<T1, T2, T3, T4, T5, T6, T7, T8>(v1, v2, v3, v4, v5, v6, v7, v8);
 
             public static Closure<T1, T2, T3, T4, T5, T6, T7, T8, T9> Create<T1, T2, T3, T4, T5, T6, T7, T8, T9>(
-                T1 v1, T2 v2, T3 v3, T4 v4, T5 v5, T6 v6, T7 v7, T8 v8, T9 v9)
-            {
-                return new Closure<T1, T2, T3, T4, T5, T6, T7, T8, T9>(v1, v2, v3, v4, v5, v6, v7, v8, v9);
-            }
+                T1 v1, T2 v2, T3 v3, T4 v4, T5 v5, T6 v6, T7 v7, T8 v8, T9 v9) =>
+                new Closure<T1, T2, T3, T4, T5, T6, T7, T8, T9>(v1, v2, v3, v4, v5, v6, v7, v8, v9);
 
-            public static Closure<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> Create<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10>(
-                T1 v1, T2 v2, T3 v3, T4 v4, T5 v5, T6 v6, T7 v7, T8 v8, T9 v9, T10 v10)
-            {
-                return new Closure<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10>(v1, v2, v3, v4, v5, v6, v7, v8, v9, v10);
-            }
+            public static Closure<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> Create<T1, T2, T3, T4, T5, T6, T7, T8, T9,
+                T10>(
+                T1 v1, T2 v2, T3 v3, T4 v4, T5 v5, T6 v6, T7 v7, T8 v8, T9 v9, T10 v10) =>
+                new Closure<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10>(v1, v2, v3, v4, v5, v6, v7, v8, v9, v10);
         }
 
         public sealed class Closure<T1>
@@ -889,45 +875,43 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
             public static readonly MethodInfo[] Methods = typeof(CurryClosureFuncs).GetPublicStaticMethods("Curry").ToArray();
 
             public static Func<R> Curry<C, R>(Func<C, R> f, C c) => () => f(c);
-
             public static Func<T1, R> Curry<C, T1, R>(Func<C, T1, R> f, C c) => t1 => f(c, t1);
-
             public static Func<T1, T2, R> Curry<C, T1, T2, R>(Func<C, T1, T2, R> f, C c) => (t1, t2) => f(c, t1, t2);
 
-            public static Func<T1, T2, T3, R> Curry<C, T1, T2, T3, R>(Func<C, T1, T2, T3, R> f, C c)
-                => (t1, t2, t3) => f(c, t1, t2, t3);
+            public static Func<T1, T2, T3, R> Curry<C, T1, T2, T3, R>(Func<C, T1, T2, T3, R> f, C c) =>
+                (t1, t2, t3) => f(c, t1, t2, t3);
 
-            public static Func<T1, T2, T3, T4, R> Curry<C, T1, T2, T3, T4, R>(Func<C, T1, T2, T3, T4, R> f, C c)
-                => (t1, t2, t3, t4) => f(c, t1, t2, t3, t4);
+            public static Func<T1, T2, T3, T4, R> Curry<C, T1, T2, T3, T4, R>(Func<C, T1, T2, T3, T4, R> f, C c) =>
+                (t1, t2, t3, t4) => f(c, t1, t2, t3, t4);
 
-            public static Func<T1, T2, T3, T4, T5, R> Curry<C, T1, T2, T3, T4, T5, R>(Func<C, T1, T2, T3, T4, T5, R> f, C c)
-                => (t1, t2, t3, t4, t5) => f(c, t1, t2, t3, t4, t5);
+            public static Func<T1, T2, T3, T4, T5, R> Curry<C, T1, T2, T3, T4, T5, R>(Func<C, T1, T2, T3, T4, T5, R> f,
+                C c) => (t1, t2, t3, t4, t5) => f(c, t1, t2, t3, t4, t5);
 
-            public static Func<T1, T2, T3, T4, T5, T6, R> Curry<C, T1, T2, T3, T4, T5, T6, R>(Func<C, T1, T2, T3, T4, T5, T6, R> f, C c)
-                => (t1, t2, t3, t4, t5, t6) => f(c, t1, t2, t3, t4, t5, t6);
+            public static Func<T1, T2, T3, T4, T5, T6, R>
+                Curry<C, T1, T2, T3, T4, T5, T6, R>(Func<C, T1, T2, T3, T4, T5, T6, R> f, C c) =>
+                (t1, t2, t3, t4, t5, t6) => f(c, t1, t2, t3, t4, t5, t6);
         }
 
         internal static class CurryClosureActions
         {
             public static readonly MethodInfo[] Methods = typeof(CurryClosureActions).GetPublicStaticMethods("Curry").ToArray();
 
-            public static Action Curry<C>(Action<C> a, C c) => () => a(c);
+            internal static Action Curry<C>(Action<C> a, C c) => () => a(c);
+            internal static Action<T1> Curry<C, T1>(Action<C, T1> f, C c) => t1 => f(c, t1);
+            internal static Action<T1, T2> Curry<C, T1, T2>(Action<C, T1, T2> f, C c) => (t1, t2) => f(c, t1, t2);
 
-            public static Action<T1> Curry<C, T1>(Action<C, T1> f, C c) => t1 => f(c, t1);
+            internal static Action<T1, T2, T3> Curry<C, T1, T2, T3>(Action<C, T1, T2, T3> f, C c) =>
+                (t1, t2, t3) => f(c, t1, t2, t3);
 
-            public static Action<T1, T2> Curry<C, T1, T2>(Action<C, T1, T2> f, C c) => (t1, t2) => f(c, t1, t2);
+            internal static Action<T1, T2, T3, T4> Curry<C, T1, T2, T3, T4>(Action<C, T1, T2, T3, T4> f, C c) =>
+                (t1, t2, t3, t4) => f(c, t1, t2, t3, t4);
 
-            public static Action<T1, T2, T3> Curry<C, T1, T2, T3>(Action<C, T1, T2, T3> f, C c)
-                => (t1, t2, t3) => f(c, t1, t2, t3);
+            internal static Action<T1, T2, T3, T4, T5> Curry<C, T1, T2, T3, T4, T5>(Action<C, T1, T2, T3, T4, T5> f,
+                C c) => (t1, t2, t3, t4, t5) => f(c, t1, t2, t3, t4, t5);
 
-            public static Action<T1, T2, T3, T4> Curry<C, T1, T2, T3, T4>(Action<C, T1, T2, T3, T4> f, C c)
-                => (t1, t2, t3, t4) => f(c, t1, t2, t3, t4);
-
-            public static Action<T1, T2, T3, T4, T5> Curry<C, T1, T2, T3, T4, T5>(Action<C, T1, T2, T3, T4, T5> f, C c)
-                => (t1, t2, t3, t4, t5) => f(c, t1, t2, t3, t4, t5);
-
-            public static Action<T1, T2, T3, T4, T5, T6> Curry<C, T1, T2, T3, T4, T5, T6>(Action<C, T1, T2, T3, T4, T5, T6> f, C c)
-                => (t1, t2, t3, t4, t5, t6) => f(c, t1, t2, t3, t4, t5, t6);
+            internal static Action<T1, T2, T3, T4, T5, T6>
+                Curry<C, T1, T2, T3, T4, T5, T6>(Action<C, T1, T2, T3, T4, T5, T6> f, C c) =>
+                (t1, t2, t3, t4, t5, t6) => f(c, t1, t2, t3, t4, t5, t6);
         }
 
         #endregion
@@ -1034,12 +1018,7 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
 
                     case ExpressionType.Conditional:
                         var condExpr = (ConditionalExpression)expr;
-                        if (!TryCollectBoundConstants(ref closure, condExpr.Test, paramExprs))
-                        {
-                            return false;
-                        }
-
-                        if ((condExpr.IfFalse.NodeType != ExpressionType.Default) &&
+                        if (!TryCollectBoundConstants(ref closure, condExpr.Test, paramExprs) ||
                             !TryCollectBoundConstants(ref closure, condExpr.IfFalse, paramExprs))
                         {
                             return false;
@@ -1050,7 +1029,7 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
 
                     case ExpressionType.Block:
                         var blockExpr = (BlockExpression)expr;
-                        closure.PushBlock(blockExpr.Result, blockExpr.Variables, Enumerable<LocalBuilder>.EmptyArray);
+                        closure.PushBlock(blockExpr.Variables, Enumerable<LocalBuilder>.EmptyArray);
                         if (!TryCollectBoundConstants(ref closure, blockExpr.Expressions, paramExprs))
                         {
                             return false;
@@ -1150,12 +1129,10 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
             // 3. Add the compiled lambda to closure of outer lambda for later invocation
 
             var lambdaParamExprs = lambdaExpr.Parameters;
-            var lambdaBodyExpr = lambdaExpr.Body;
 
             var nestedClosure = new ClosureInfo(false);
             var compiledLambda = TryCompile(ref nestedClosure,
-                lambdaExpr.Type, Tools.GetParamTypes(lambdaParamExprs), lambdaExpr.ReturnType, lambdaBodyExpr,
-                lambdaBodyExpr.Type,
+                lambdaExpr.Type, Tools.GetParamTypes(lambdaParamExprs), lambdaExpr.ReturnType, lambdaExpr.Body,
                 lambdaParamExprs, isNestedLambda: true);
 
             if (compiledLambda == null)
@@ -1219,7 +1196,7 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                 var catchExVar = catchBlock.Variable;
                 if (catchExVar != null)
                 {
-                    closure.PushBlock(catchBody, new[] { catchExVar }, Enumerable<LocalBuilder>.EmptyArray);
+                    closure.PushBlock(new[] { catchExVar }, Enumerable<LocalBuilder>.EmptyArray);
                     if (!TryCollectBoundConstants(ref closure, catchExVar, paramExprs))
                     {
                         return false;
@@ -1262,6 +1239,20 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
 
         #endregion
 
+        // The minimal context-aware flags set by parent
+        [Flags]
+        internal enum ParentFlags
+        {
+            Empty = 0,
+            IgnoreResult = 1 << 1,
+            Call = 1 << 2,
+            MemberAccess = 1 << 3,
+            Arithmetic = 1 << 4,
+            Coalesce = 1 << 5
+        }
+
+        internal static bool ShouldIgnoreResult(ParentFlags parent) => (parent & ParentFlags.IgnoreResult) != 0;
+
         /// <summary>Supports emitting of selected expressions, e.g. lambdaExpr are not supported yet.
         /// When emitter find not supported expression it will return false from <see cref="TryEmit"/>, so I could fallback
         /// to normal and slow Expression.Compile.</summary>
@@ -1276,122 +1267,206 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
 
             private static readonly MethodInfo _objectEqualsMethod = ((Func<object, object, bool>)object.Equals).Method;
 #endif
+
             public static bool TryEmit(
                 Expression expr,
-                Type exprType,
                 IList<ParameterExpression> paramExprs,
                 ILGenerator il,
                 ref ClosureInfo closure,
-                ExpressionType parent,
-                bool ignoreResult = false,
-                bool isMemberAccess = false,
+                ParentFlags parent,
                 int byRefIndex = -1)
             {
-                switch (expr.NodeType)
+                while (true)
                 {
-                    case ExpressionType.Parameter:
-                        return ignoreResult || TryEmitParameter((ParameterExpression)expr, paramExprs, il, ref closure,
-                                   parent, isMemberAccess, byRefIndex);
-                    case ExpressionType.Convert:
-                        return TryEmitConvert((UnaryExpression)expr, exprType, paramExprs, il, ref closure,
-                            ignoreResult, isMemberAccess);
-                    case ExpressionType.ArrayIndex:
-                        return EmitBinary((BinaryExpression)expr, paramExprs, il, ref closure, ExpressionType.ArrayIndex, ignoreResult, isMemberAccess)
-                            && TryEmitArrayIndex(expr.Type, il);
-                    case ExpressionType.Constant:
-                        return ignoreResult || TryEmitConstant((ConstantExpression)expr, exprType, il, ref closure);
-                    case ExpressionType.Call:
-                        return TryEmitMethodCall((MethodCallExpression)expr, paramExprs, il, ref closure, ignoreResult, isMemberAccess);
-                    case ExpressionType.MemberAccess:
-                        return TryEmitMemberAccess((MemberExpression)expr, paramExprs, il, ref closure, ignoreResult);
-                    case ExpressionType.New:
-                        var newExpr = (NewExpression)expr;
-                        return TryEmitMany(newExpr.Arguments, paramExprs, il, ref closure, ExpressionType.New, ignoreResult, isMemberAccess)
-                            && TryEmitNew(newExpr.Constructor, exprType, il);
-                    case ExpressionType.NewArrayBounds:
-                    case ExpressionType.NewArrayInit:
-                        return EmitNewArray((NewArrayExpression)expr, exprType, paramExprs, il, ref closure,
-                            ignoreResult, isMemberAccess);
-                    case ExpressionType.MemberInit:
-                        return EmitMemberInit((MemberInitExpression)expr, exprType, paramExprs, il, ref closure, parent,
-                            ignoreResult, isMemberAccess);
-                    case ExpressionType.Lambda:
-                        return TryEmitNestedLambda((LambdaExpression)expr, paramExprs, il, ref closure);
+                    switch (expr.NodeType)
+                    {
+                        case ExpressionType.Parameter:
+                            return ShouldIgnoreResult(parent) ||
+                                   TryEmitParameter((ParameterExpression)expr, paramExprs, il, ref closure, parent,
+                                       byRefIndex);
 
-                    case ExpressionType.Invoke:
-                        return TryEmitInvoke((InvocationExpression)expr, paramExprs, il, ref closure, ignoreResult, isMemberAccess);
+                        case ExpressionType.Convert:
+                            return TryEmitConvert((UnaryExpression)expr, paramExprs, il, ref closure, parent);
 
-                    case ExpressionType.GreaterThan:
-                    case ExpressionType.GreaterThanOrEqual:
-                    case ExpressionType.LessThan:
-                    case ExpressionType.LessThanOrEqual:
-                    case ExpressionType.Equal:
-                    case ExpressionType.NotEqual:
-                        var binaryExpr = (BinaryExpression)expr;
-                        return TryEmitComparison(binaryExpr.Left, binaryExpr.Right, binaryExpr.NodeType, paramExprs, il, ref closure,
-                            ignoreResult, isMemberAccess);
+                        case ExpressionType.ArrayIndex:
+                            var arrIndexExpr = (BinaryExpression)expr;
+                            return TryEmit(arrIndexExpr.Left, paramExprs, il, ref closure, parent) &&
+                                   TryEmit(arrIndexExpr.Right, paramExprs, il, ref closure, parent) &&
+                                   TryEmitArrayIndex(expr.Type, il);
 
-                    case ExpressionType arithmeticExprType when Tools.IsArithmetic(arithmeticExprType):
-                        return TryEmitArithmeticOperation((BinaryExpression)expr, arithmeticExprType, exprType,
-                            paramExprs, il, ref closure, ignoreResult, isMemberAccess);
+                        case ExpressionType.Constant:
+                            return ShouldIgnoreResult(parent) ||
+                                   TryEmitConstant((ConstantExpression)expr, il, ref closure);
 
-                    case ExpressionType.AndAlso:
-                    case ExpressionType.OrElse:
-                        return TryEmitLogicalOperator((BinaryExpression)expr, paramExprs, il, ref closure, ignoreResult,
-                            isMemberAccess);
+                        case ExpressionType.Call:
+                            return TryEmitMethodCall((MethodCallExpression)expr, paramExprs, il, ref closure, parent);
 
-                    case ExpressionType.Coalesce:
-                        return TryEmitCoalesceOperator((BinaryExpression)expr, paramExprs, il, ref closure,
-                            ignoreResult, isMemberAccess);
+                        case ExpressionType.MemberAccess:
+                            return TryEmitMemberAccess((MemberExpression)expr, paramExprs, il, ref closure, parent);
 
-                    case ExpressionType.Conditional:
-                        return TryEmitConditional((ConditionalExpression)expr, paramExprs, il, ref closure,
-                            ignoreResult, isMemberAccess);
+                        case ExpressionType.New:
+                            var newExpr = (NewExpression)expr;
+                            var argExprs = newExpr.Arguments;
+                            for (var i = 0; i < argExprs.Count; i++)
+                            {
+                                if (!TryEmit(argExprs[i], paramExprs, il, ref closure, parent, i))
+                                {
+                                    return false;
+                                }
+                            }
 
-                    case ExpressionType.PostIncrementAssign:
-                    case ExpressionType.PreIncrementAssign:
-                    case ExpressionType.PostDecrementAssign:
-                    case ExpressionType.PreDecrementAssign:
-                        return TryEmitIncDecAssign((UnaryExpression)expr, il, ref closure, parent);
+                            return TryEmitNew(newExpr.Constructor, newExpr.Type, il);
 
-                    case ExpressionType arithmeticAssign
-                        when Tools.GetArithmeticFromArithmeticAssignOrSelf(arithmeticAssign) != arithmeticAssign:
-                    case ExpressionType.Assign:
-                        return TryEmitAssign((BinaryExpression)expr, exprType, paramExprs, il, ref closure,
-                            ignoreResult, isMemberAccess);
+                        case ExpressionType.NewArrayBounds:
+                        case ExpressionType.NewArrayInit:
+                            return EmitNewArray((NewArrayExpression)expr, paramExprs, il, ref closure, parent);
 
-                    case ExpressionType.Block:
-                        return TryEmitBlock((BlockExpression)expr, paramExprs, il, ref closure, ignoreResult,
-                            isMemberAccess);
+                        case ExpressionType.MemberInit:
+                            return EmitMemberInit((MemberInitExpression)expr, paramExprs, il, ref closure, parent);
 
-                    case ExpressionType.Try:
-                        return TryEmitTryCatchFinallyBlock((TryExpression)expr, exprType, paramExprs, il, ref closure,
-                            ignoreResult, isMemberAccess);
+                        case ExpressionType.Lambda:
+                            return TryEmitNestedLambda((LambdaExpression)expr, paramExprs, il, ref closure);
 
-                    case ExpressionType.Throw:
-                        return TryEmitThrow((UnaryExpression)expr, paramExprs, il, ref closure, ignoreResult,
-                            isMemberAccess);
+                        case ExpressionType.Invoke:
+                            return TryEmitInvoke((InvocationExpression)expr, paramExprs, il, ref closure, parent);
 
-                    case ExpressionType.Default:
-                        return exprType == typeof(void) || EmitDefault(exprType, il);
+                        case ExpressionType.GreaterThan:
+                        case ExpressionType.GreaterThanOrEqual:
+                        case ExpressionType.LessThan:
+                        case ExpressionType.LessThanOrEqual:
+                        case ExpressionType.Equal:
+                        case ExpressionType.NotEqual:
+                            var binaryExpr = (BinaryExpression)expr;
+                            return TryEmitComparison(binaryExpr.Left, binaryExpr.Right, binaryExpr.NodeType,
+                                paramExprs, il, ref closure, parent);
 
-                    case ExpressionType.Index:
-                        return TryEmitIndex((IndexExpression)expr, exprType, paramExprs, il, ref closure, ignoreResult,
-                            isMemberAccess);
+                        case ExpressionType.Add:
+                        case ExpressionType.AddChecked:
+                        case ExpressionType.Subtract:
+                        case ExpressionType.SubtractChecked:
+                        case ExpressionType.Multiply:
+                        case ExpressionType.MultiplyChecked:
+                        case ExpressionType.Divide:
+                        case ExpressionType.Modulo:
+                        case ExpressionType.Power:
+                        case ExpressionType.And:
+                        case ExpressionType.Or:
+                        case ExpressionType.ExclusiveOr:
+                        case ExpressionType.LeftShift:
+                        case ExpressionType.RightShift:
+                            var arithmeticExpr = (BinaryExpression)expr;
+                            return
+                                TryEmit(arithmeticExpr.Left, paramExprs, il, ref closure,
+                                    parent | ParentFlags.Arithmetic) &&
+                                TryEmit(arithmeticExpr.Right, paramExprs, il, ref closure,
+                                    parent | ParentFlags.Arithmetic) &&
+                                TryEmitArithmeticOperation(expr.NodeType, expr.Type, il);
 
-                    case ExpressionType.Goto:
-                        return TryEmitGoto((GotoExpression)expr, il, ref closure);
+                        case ExpressionType.AndAlso:
+                        case ExpressionType.OrElse:
+                            return TryEmitLogicalOperator((BinaryExpression)expr, paramExprs, il, ref closure, parent);
 
-                    case ExpressionType.Label:
-                        return TryEmitLabel((LabelExpression)expr, paramExprs, il, ref closure, ignoreResult,
-                            isMemberAccess);
+                        case ExpressionType.Coalesce:
+                            return TryEmitCoalesceOperator((BinaryExpression)expr, paramExprs, il, ref closure, parent);
 
-                    case ExpressionType.Switch:
-                        return TryEmitSwitch((SwitchExpression)expr, paramExprs, il, ref closure, ignoreResult,
-                            isMemberAccess);
+                        case ExpressionType.Conditional:
+                            return TryEmitConditional((ConditionalExpression)expr, paramExprs, il, ref closure, parent);
 
-                    default:
-                        return false;
+                        case ExpressionType.PostIncrementAssign:
+                        case ExpressionType.PreIncrementAssign:
+                        case ExpressionType.PostDecrementAssign:
+                        case ExpressionType.PreDecrementAssign:
+                            return TryEmitIncDecAssign((UnaryExpression)expr, il, ref closure, parent);
+
+                        case ExpressionType arithmeticAssign
+                            when Tools.GetArithmeticFromArithmeticAssignOrSelf(arithmeticAssign) != arithmeticAssign:
+                        case ExpressionType.Assign:
+                            return TryEmitAssign((BinaryExpression)expr, paramExprs, il, ref closure, parent);
+
+                        case ExpressionType.Block:
+                            var blockExpr = (BlockExpression)expr;
+                            var blockHasVars = blockExpr.Variables.Count != 0;
+                            if (blockHasVars)
+                            {
+                                closure.PushBlockAndConstructLocalVars(blockExpr.Variables, il);
+                            }
+
+                            // ignore result for all not the last statements in block
+                            var exprs = blockExpr.Expressions;
+                            for (var i = 0; i < exprs.Count - 1; i++)
+                            {
+                                if (!TryEmit(exprs[i], paramExprs, il, ref closure, parent | ParentFlags.IgnoreResult))
+                                {
+                                    return false;
+                                }
+                            }
+
+                            // last (result) statement in block will provide the result
+                            expr = blockExpr.Result;
+                            if (!blockHasVars)
+                            {
+                                continue; // omg, no recursion!
+                            }
+
+                            if (!TryEmit(blockExpr.Result, paramExprs, il, ref closure, parent))
+                            {
+                                return false;
+                            }
+
+                            closure.PopBlock();
+                            return true;
+
+                        case ExpressionType.Try:
+                            return TryEmitTryCatchFinallyBlock((TryExpression)expr, paramExprs, il, ref closure,
+                                parent);
+
+                        case ExpressionType.Throw:
+                            {
+                                var opExpr = ((UnaryExpression)expr).Operand;
+                                if (!TryEmit(opExpr, paramExprs, il, ref closure, parent))
+                                {
+                                    return false;
+                                }
+
+                                il.ThrowException(opExpr.Type);
+                                return true;
+                            }
+
+                        case ExpressionType.Default:
+                            return expr.Type == typeof(void) || ShouldIgnoreResult(parent) ||
+                                   EmitDefault(expr.Type, il);
+
+                        case ExpressionType.Index:
+                            var indexExpr = (IndexExpression)expr;
+                            if (indexExpr.Object != null &&
+                                !TryEmit(indexExpr.Object, paramExprs, il, ref closure, parent))
+                            {
+                                return false;
+                            }
+
+                            var indexArgExprs = indexExpr.Arguments;
+                            for (var i = 0; i < indexArgExprs.Count; i++)
+                            {
+                                if (!TryEmit(indexArgExprs[i], paramExprs, il, ref closure, parent, i))
+                                {
+                                    return false;
+                                }
+                            }
+
+                            return TryEmitIndex((IndexExpression)expr, il);
+
+                        case ExpressionType.Goto:
+                            return TryEmitGoto((GotoExpression)expr, il, ref closure);
+
+                        case ExpressionType.Label:
+                            return TryEmitLabel((LabelExpression)expr, paramExprs, il, ref closure, parent);
+
+                        case ExpressionType.Switch:
+                            return TryEmitSwitch((SwitchExpression)expr, paramExprs, il, ref closure, parent);
+
+                        default:
+                            return false;
+                    }
                 }
             }
 
@@ -1400,24 +1475,20 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                 IList<ParameterExpression> paramExprs,
                 ILGenerator il,
                 ref ClosureInfo closure,
-                bool ignoreResult,
-                bool isMemberAccess)
+                ParentFlags parent)
             {
                 var lbl = closure.Labels.FirstOrDefault(x => x.Key == expr.Target);
                 if (lbl.Key != expr.Target)
                 {
-                    lbl = new KeyValuePair<object, Label>(expr.Target, il.DefineLabel());
-                    closure.Labels[closure.LabelCount++] = lbl;
+                    closure.Labels[closure.LabelCount++] = lbl = new KeyValuePair<object, Label>(expr.Target, il.DefineLabel());
                 }
 
                 il.MarkLabel(lbl.Value);
 
-                var defaultVal = expr.DefaultValue;
-                return defaultVal == null
-                    || TryEmit(defaultVal, defaultVal.Type, paramExprs, il, ref closure, ExpressionType.Label, ignoreResult, isMemberAccess);
+                return expr.DefaultValue == null || TryEmit(expr.DefaultValue, paramExprs, il, ref closure, parent);
             }
 
-            // todo : GotoExpression.Value 
+            // todo: GotoExpression.Value 
             private static bool TryEmitGoto(GotoExpression exprObj, ILGenerator il, ref ClosureInfo closure)
             {
                 var labels = closure.Labels;
@@ -1447,17 +1518,9 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                 return false;
             }
 
-            private static bool TryEmitIndex(IndexExpression expr, Type elemType,
-                IList<ParameterExpression> paramExprs, ILGenerator il, ref ClosureInfo closure,
-                bool ignoreResult, bool isMemberAccess)
+            private static bool TryEmitIndex(IndexExpression expr, ILGenerator il)
             {
-                if (expr.Object != null &&
-                    !TryEmit(expr.Object, expr.Object.Type, paramExprs, il, ref closure, ExpressionType.Index, ignoreResult, isMemberAccess) ||
-                    !TryEmitMany(expr.Arguments, paramExprs, il, ref closure, ExpressionType.Index, ignoreResult, isMemberAccess))
-                {
-                    return false;
-                }
-
+                var elemType = expr.Type;
                 if (expr.Indexer != null)
                 {
                     return EmitMethodCall(il, expr.Indexer.GetGetter());
@@ -1482,7 +1545,7 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
             }
 
             private static bool TryEmitCoalesceOperator(BinaryExpression exprObj,
-                IList<ParameterExpression> paramExprs, ILGenerator il, ref ClosureInfo closure, bool ignoreResult, bool isMemberAccess)
+                IList<ParameterExpression> paramExprs, ILGenerator il, ref ClosureInfo closure, ParentFlags parent)
             {
                 var labelFalse = il.DefineLabel();
                 var labelDone = il.DefineLabel();
@@ -1490,8 +1553,7 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                 var left = exprObj.Left;
                 var right = exprObj.Right;
 
-                if (!TryEmit(left, left.Type, paramExprs, il, ref closure, ExpressionType.Coalesce, ignoreResult,
-                    isMemberAccess))
+                if (!TryEmit(left, paramExprs, il, ref closure, parent | ParentFlags.Coalesce))
                 {
                     return false;
                 }
@@ -1502,23 +1564,22 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                     var loc = il.DeclareLocal(leftType);
                     il.Emit(OpCodes.Stloc_S, loc);
                     il.Emit(OpCodes.Ldloca_S, loc);
-                    var hasValueMethod = leftType.GetPublicInstanceMethod("get_HasValue");
-                    if (!EmitMethodCall(il, hasValueMethod))
+
+                    if (!EmitMethodCall(il, leftType.FindNullableHasValueGetterMethod()))
                     {
                         return false;
                     }
 
                     il.Emit(OpCodes.Brfalse, labelFalse);
                     il.Emit(OpCodes.Ldloca_S, loc);
-                    var mthValue = leftType.GetPublicInstanceMethod("GetValueOrDefault", parameterCount: 0);
-                    if (!EmitMethodCall(il, mthValue))
+                    if (!EmitMethodCall(il, leftType.FindNullableHasValueGetterMethod()))
                     {
                         return false;
                     }
 
                     il.Emit(OpCodes.Br, labelDone);
                     il.MarkLabel(labelFalse);
-                    if (!TryEmit(right, right.Type, paramExprs, il, ref closure, ExpressionType.Coalesce, ignoreResult, isMemberAccess))
+                    if (!TryEmit(right, paramExprs, il, ref closure, parent | ParentFlags.Coalesce))
                     {
                         return false;
                     }
@@ -1534,7 +1595,7 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
 
                 il.Emit(OpCodes.Pop); // left is null, pop its value from the stack
 
-                if (!TryEmit(right, right.Type, paramExprs, il, ref closure, ExpressionType.Coalesce, ignoreResult, isMemberAccess))
+                if (!TryEmit(right, paramExprs, il, ref closure, parent | ParentFlags.Coalesce))
                 {
                     return false;
                 }
@@ -1611,24 +1672,14 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                 return true;
             }
 
-            private static bool TryEmitBlock(BlockExpression blockExpr,
-                IList<ParameterExpression> paramExprs, ILGenerator il, ref ClosureInfo closure,
-                bool ignoreResult, bool isMemberAccess)
-            {
-                closure.PushBlockAndConstructLocalVars(blockExpr.Result, blockExpr.Variables, il);
-                var ok = TryEmitMany(blockExpr.Expressions, paramExprs, il, ref closure, ExpressionType.Block,
-                    ignoreResult, isMemberAccess);
-                closure.PopBlock();
-                return ok;
-            }
 
-            private static bool TryEmitTryCatchFinallyBlock(TryExpression tryExpr, Type exprType,
-                IList<ParameterExpression> paramExprs, ILGenerator il, ref ClosureInfo closure,
-                bool ignoreResult, bool isMemberAccess)
+            private static bool TryEmitTryCatchFinallyBlock(TryExpression tryExpr,
+                IList<ParameterExpression> paramExprs, ILGenerator il, ref ClosureInfo closure, ParentFlags parent)
             {
+                var exprType = tryExpr.Type;
                 var returnLabel = default(Label);
                 var returnResult = default(LocalBuilder);
-                var isNonVoid = exprType != typeof(void); // todo: check how it is correlated with `ignoreResult`
+                var isNonVoid = exprType != typeof(void); // todo: check how it is correlated with `parent.IgnoreResult`
                 if (isNonVoid)
                 {
                     returnLabel = il.DefineLabel();
@@ -1637,7 +1688,7 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
 
                 il.BeginExceptionBlock();
                 var tryBodyExpr = tryExpr.Body;
-                if (!TryEmit(tryBodyExpr, tryBodyExpr.Type, paramExprs, il, ref closure, ExpressionType.Try, ignoreResult, isMemberAccess))
+                if (!TryEmit(tryBodyExpr, paramExprs, il, ref closure, parent))
                 {
                     return false;
                 }
@@ -1661,17 +1712,16 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
 
                     // at the beginning of catch the Exception value is on the stack,
                     // we will store into local variable.
-                    var catchBodyExpr = catchBlock.Body;
                     var exVarExpr = catchBlock.Variable;
                     if (exVarExpr != null)
                     {
                         var exVar = il.DeclareLocal(exVarExpr.Type);
-                        closure.PushBlock(catchBodyExpr, new[] { exVarExpr }, new[] { exVar });
+                        closure.PushBlock(new[] { exVarExpr }, new[] { exVar });
                         il.Emit(OpCodes.Stloc_S, exVar);
                     }
 
-                    if (!TryEmit(catchBodyExpr, catchBodyExpr.Type, paramExprs, il, ref closure, ExpressionType.Try,
-                        ignoreResult, isMemberAccess))
+                    var catchBodyExpr = catchBlock.Body;
+                    if (!TryEmit(catchBodyExpr, paramExprs, il, ref closure, parent))
                     {
                         return false;
                     }
@@ -1699,8 +1749,7 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                 if (finallyExpr != null)
                 {
                     il.BeginFinallyBlock();
-                    if (!TryEmit(finallyExpr, finallyExpr.Type, paramExprs, il, ref closure, ExpressionType.Try,
-                        ignoreResult, isMemberAccess))
+                    if (!TryEmit(finallyExpr, paramExprs, il, ref closure, parent))
                     {
                         return false;
                     }
@@ -1716,28 +1765,16 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                 return true;
             }
 
-            private static bool TryEmitThrow(
-                UnaryExpression exprObj,
-                IList<ParameterExpression> paramExprs,
-                ILGenerator il,
-                ref ClosureInfo closure,
-                bool ignoreResult,
-                bool isMemberAccess)
-            {
-                var ok = TryEmit(exprObj.Operand, exprObj.Operand.Type, paramExprs, il, ref closure, ExpressionType.Throw, ignoreResult, isMemberAccess);
-                il.ThrowException(exprObj.Operand.Type);
-                return ok;
-            }
-
             private static bool TryEmitParameter(
                 ParameterExpression paramExpr,
                 IList<ParameterExpression> paramExprs,
                 ILGenerator il,
                 ref ClosureInfo closure,
-                ExpressionType parent,
-                bool isMemberAccess,
+                ParentFlags parent,
                 int byRefIndex = -1)
             {
+                var paramType = paramExpr.Type;
+
                 // if parameter is passed through, then just load it on stack
                 var paramIndex = paramExprs.GetFirstIndex(paramExpr);
                 if (paramIndex != -1)
@@ -1748,22 +1785,20 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                     }
 
                     var asAddress =
-                        (parent == ExpressionType.Call || parent == ExpressionType.MemberAccess) &&
-                         paramExpr.Type.IsValueType() &&
-                        !paramExpr.Type.IsPrimitive() &&
-                        !paramExpr.IsByRef;
+                        paramType.IsValueType() && !paramExpr.IsByRef &&
+                        (parent & (ParentFlags.Call | ParentFlags.MemberAccess)) != 0;
 
                     EmitLoadParamArg(il, paramIndex, asAddress);
 
                     if (paramExpr.IsByRef)
                     {
-                        if (parent == ExpressionType.Coalesce)
+                        if ((parent & ParentFlags.Coalesce) != 0)
                         {
                             il.Emit(OpCodes.Ldind_Ref); // Coalesce on for ref types
                         }
-                        else if (Tools.IsArithmetic(parent))
+                        else if ((parent & ParentFlags.Arithmetic) != 0)
                         {
-                            EmitDereference(il, paramExpr.Type);
+                            EmitDereference(il, paramType);
                         }
                     }
 
@@ -1781,7 +1816,15 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                 var variable = closure.GetDefinedLocalVarOrDefault(paramExpr);
                 if (variable != null)
                 {
-                    il.Emit(paramExpr.Type.IsValueType() && isMemberAccess ? OpCodes.Ldloca_S : OpCodes.Ldloc, variable);
+                    if (byRefIndex != -1 || (paramType.IsValueType() && (parent & ParentFlags.MemberAccess) != 0))
+                    {
+                        il.Emit(OpCodes.Ldloca_S, variable);
+                    }
+                    else
+                    {
+                        il.Emit(OpCodes.Ldloc, variable);
+                    }
+
                     return true;
                 }
 
@@ -1800,7 +1843,7 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                 }
 
                 var closureItemIndex = closure.Constants.Length + nonPassedParamIndex;
-                return LoadClosureFieldOrItem(ref closure, il, closureItemIndex, paramExpr.Type);
+                return LoadClosureFieldOrItem(ref closure, il, closureItemIndex, paramType);
             }
 
             private static void EmitDereference(ILGenerator il, Type type)
@@ -1901,47 +1944,19 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                 }
             }
 
-            private static bool EmitBinary(BinaryExpression expr,
-                IList<ParameterExpression> paramExprs, ILGenerator il, ref ClosureInfo closure,
-                ExpressionType parent, bool ignoreResult, bool isMemberAccess)
+            private static bool TryEmitConvert(UnaryExpression expr,
+                IList<ParameterExpression> paramExprs, ILGenerator il, ref ClosureInfo closure, ParentFlags parent)
             {
-                return TryEmit(expr.Left, expr.Left.Type, paramExprs, il, ref closure, parent, ignoreResult,
-                           isMemberAccess) &&
-                       TryEmit(expr.Right, expr.Right.Type, paramExprs, il, ref closure, parent, ignoreResult,
-                           isMemberAccess);
-            }
-
-            private static bool TryEmitMany(IList<Expression> exprs,
-                IList<ParameterExpression> paramExprs, ILGenerator il, ref ClosureInfo closure,
-                ExpressionType parent, bool ignoreResult, bool isMemberAccess)
-            {
-                for (int i = 0, n = exprs.Count; i < n; i++)
-                {
-                    var expr = exprs[i];
-                    // ignore the result of expression if it is not the result expression, e.g. not the last expression in block
-                    var ignore = ignoreResult || parent == ExpressionType.Block && expr != closure.CurrentBlock.ResultExpr;
-                    if (!TryEmit(expr, expr.Type, paramExprs, il, ref closure, parent, ignore, isMemberAccess, i))
-                    {
-                        return false;
-                    }
-                }
-
-                return true;
-            }
-
-            private static bool TryEmitConvert(UnaryExpression expr, Type targetType,
-                IList<ParameterExpression> paramExprs, ILGenerator il, ref ClosureInfo closure,
-                bool ignoreResult, bool isMemberAccess)
-            {
+                var targetType = expr.Type;
                 var opExpr = expr.Operand;
                 var method = expr.Method;
                 if (method != null && method.Name != "op_Implicit" && method.Name != "op_Explicit")
                 {
-                    return TryEmit(opExpr, opExpr.Type, paramExprs, il, ref closure, ExpressionType.Call, false, isMemberAccess, 0)
-                        && EmitMethodCall(il, method, ignoreResult);
+                    return TryEmit(opExpr, paramExprs, il, ref closure, parent & ~ParentFlags.IgnoreResult | ParentFlags.Call, 0)
+                        && EmitMethodCall(il, method, parent);
                 }
 
-                if (!TryEmit(opExpr, opExpr.Type, paramExprs, il, ref closure, ExpressionType.Convert, false, isMemberAccess))
+                if (!TryEmit(opExpr, paramExprs, il, ref closure, parent & ~ParentFlags.IgnoreResult))
                 {
                     return false;
                 }
@@ -1954,7 +1969,7 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                         il.Emit(OpCodes.Box, sourceType);
                     }
 
-                    if (ignoreResult)
+                    if (ShouldIgnoreResult(parent))
                     {
                         il.Emit(OpCodes.Pop);
                     }
@@ -1968,7 +1983,7 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                     var convertOpMethod = FirstConvertOperatorOrDefault(sourceType, targetType, sourceType);
                     if (convertOpMethod != null)
                     {
-                        return EmitMethodCall(il, convertOpMethod, ignoreResult);
+                        return EmitMethodCall(il, convertOpMethod, parent);
                     }
                 }
 
@@ -1977,7 +1992,7 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                     var convertOpMethod = FirstConvertOperatorOrDefault(targetType, targetType, sourceType);
                     if (convertOpMethod != null)
                     {
-                        return EmitMethodCall(il, convertOpMethod, ignoreResult);
+                        return EmitMethodCall(il, convertOpMethod, parent);
                     }
                 }
 
@@ -2044,7 +2059,7 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                     }
                 }
 
-                if (ignoreResult)
+                if (ShouldIgnoreResult(parent))
                 {
                     il.Emit(OpCodes.Pop);
                 }
@@ -2055,8 +2070,9 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
             private static MethodInfo FirstConvertOperatorOrDefault(Type type, Type targetType, Type sourceType)
                 => type.GetOperators().GetFirst(m => m.ReturnType == targetType && m.GetParameters()[0].ParameterType == sourceType);
 
-            private static bool TryEmitConstant(ConstantExpression expr, Type exprType, ILGenerator il, ref ClosureInfo closure)
+            private static bool TryEmitConstant(ConstantExpression expr, ILGenerator il, ref ClosureInfo closure)
             {
+                var exprType = expr.Type;
                 var constantValue = expr.Value;
                 if (constantValue == null)
                 {
@@ -2250,10 +2266,10 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                 return true;
             }
 
-            private static bool EmitNewArray(NewArrayExpression expr, Type arrayType,
-                IList<ParameterExpression> paramExprs, ILGenerator il, ref ClosureInfo closure,
-                bool ignoreResult, bool isMemberAccess)
+            private static bool EmitNewArray(NewArrayExpression expr,
+                IList<ParameterExpression> paramExprs, ILGenerator il, ref ClosureInfo closure, ParentFlags parent)
             {
+                var arrayType = expr.Type;
                 var elems = expr.Expressions;
                 var elemType = arrayType.GetElementType();
                 if (elemType == null)
@@ -2270,9 +2286,12 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                 }
                 else // multi dimensional
                 {
-                    if (!TryEmitMany(elems, paramExprs, il, ref closure, ExpressionType.NewArrayInit, ignoreResult, isMemberAccess))
+                    for (var i = 0; i < elems.Count; i++)
                     {
-                        return false;
+                        if (!TryEmit(elems[i], paramExprs, il, ref closure, parent, i))
+                        {
+                            return false;
+                        }
                     }
 
                     il.Emit(OpCodes.Newobj, arrayType.GetPublicInstanceConstructor());
@@ -2295,9 +2314,7 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                         il.Emit(OpCodes.Ldelema, elemType);
                     }
 
-                    var elemExpr = elems[i];
-                    if (!TryEmit(elemExpr, elemExpr.Type, paramExprs, il, ref closure, ExpressionType.NewArrayInit,
-                        ignoreResult, isMemberAccess))
+                    if (!TryEmit(elems[i], paramExprs, il, ref closure, parent))
                     {
                         return false;
                     }
@@ -2330,31 +2347,39 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                 return true;
             }
 
-            private static bool EmitMemberInit(MemberInitExpression expr, Type exprType,
-                IList<ParameterExpression> paramExprs, ILGenerator il, ref ClosureInfo closure,
-                ExpressionType parent, bool ignoreResult, bool isMemberAccess)
+            private static bool EmitMemberInit(MemberInitExpression expr,
+                IList<ParameterExpression> paramExprs, ILGenerator il, ref ClosureInfo closure, ParentFlags parent)
             {
                 // todo: Use closureInfo Block to track the variable instead
                 LocalBuilder valueVar = null;
-                if (exprType.IsValueType())
+                if (expr.Type.IsValueType())
                 {
-                    valueVar = il.DeclareLocal(exprType);
+                    valueVar = il.DeclareLocal(expr.Type);
                 }
 
                 var newExpr = expr.NewExpression;
 #if LIGHT_EXPRESSION
                 if (newExpr == null)
                 {
-                    if (!TryEmit(expr.Expression, exprType, paramExprs, il, ref closure, 
-                        ExpressionType.MemberInit, ignoreResult, isMemberAccess/*, valueVar*/)) // todo: fix me
+                    if (!TryEmit(expr.Expression, paramExprs, il, ref closure, parent/*, valueVar*/)) // todo: fix me
                         return false;
                 }
                 else
 #endif
-                if (!TryEmitMany(newExpr.Arguments, paramExprs, il, ref closure, ExpressionType.New, ignoreResult, isMemberAccess) ||
-                    !TryEmitNew(newExpr.Constructor, exprType, il, valueVar))
                 {
-                    return false;
+                    var argExprs = newExpr.Arguments;
+                    for (var i = 0; i < argExprs.Count; i++)
+                    {
+                        if (!TryEmit(argExprs[i], paramExprs, il, ref closure, parent, i))
+                        {
+                            return false;
+                        }
+                    }
+
+                    if (!TryEmitNew(newExpr.Constructor, newExpr.Type, il, valueVar))
+                    {
+                        return false;
+                    }
                 }
 
                 var bindings = expr.Bindings;
@@ -2375,8 +2400,7 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                         il.Emit(OpCodes.Dup); // duplicate member owner on stack
                     }
 
-                    var bindingExpr = ((MemberAssignment)binding).Expression;
-                    if (!TryEmit(bindingExpr, bindingExpr.Type, paramExprs, il, ref closure, parent, ignoreResult, isMemberAccess) ||
+                    if (!TryEmit(((MemberAssignment)binding).Expression, paramExprs, il, ref closure, parent) ||
                         !EmitMemberAssign(il, binding.Member))
                     {
                         return false;
@@ -2406,7 +2430,7 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                 return false;
             }
 
-            private static bool TryEmitIncDecAssign(UnaryExpression expr, ILGenerator il, ref ClosureInfo closure, ExpressionType parent)
+            private static bool TryEmitIncDecAssign(UnaryExpression expr, ILGenerator il, ref ClosureInfo closure, ParentFlags parent)
             {
                 var varIdx = closure.CurrentBlock.VarExprs.GetFirstIndex((ParameterExpression)expr.Operand);
                 if (varIdx == -1)
@@ -2421,14 +2445,14 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                 {
                     il.Emit(OpCodes.Ldc_I4_1);
                     il.Emit(OpCodes.Add);
-                    if (parent != ExpressionType.Block || closure.CurrentBlock.ResultExpr == expr)
+                    if ((parent & ParentFlags.IgnoreResult) == 0)
                     {
                         il.Emit(OpCodes.Dup);
                     }
                 }
                 else if (nodeType == ExpressionType.PostIncrementAssign)
                 {
-                    if (parent != ExpressionType.Block || closure.CurrentBlock.ResultExpr == expr)
+                    if ((parent & ParentFlags.IgnoreResult) == 0)
                     {
                         il.Emit(OpCodes.Dup);
                     }
@@ -2440,14 +2464,14 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                 {
                     il.Emit(OpCodes.Ldc_I4_M1);
                     il.Emit(OpCodes.Add);
-                    if (parent != ExpressionType.Block || closure.CurrentBlock.ResultExpr == expr)
+                    if ((parent & ParentFlags.IgnoreResult) == 0)
                     {
                         il.Emit(OpCodes.Dup);
                     }
                 }
                 else if (nodeType == ExpressionType.PostDecrementAssign)
                 {
-                    if (parent != ExpressionType.Block || closure.CurrentBlock.ResultExpr == expr)
+                    if ((parent & ParentFlags.IgnoreResult) == 0)
                     {
                         il.Emit(OpCodes.Dup);
                     }
@@ -2460,10 +2484,10 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                 return true;
             }
 
-            private static bool TryEmitAssign(BinaryExpression expr, Type exprType,
-                IList<ParameterExpression> paramExprs, ILGenerator il, ref ClosureInfo closure,
-                bool ignoreResult, bool isMemberAccess)
+            private static bool TryEmitAssign(BinaryExpression expr,
+                IList<ParameterExpression> paramExprs, ILGenerator il, ref ClosureInfo closure, ParentFlags parent)
             {
+                var exprType = expr.Type;
                 var left = expr.Left;
                 var right = expr.Right;
                 var leftNodeType = expr.Left.NodeType;
@@ -2472,6 +2496,7 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                 // if this assignment is part of a single body-less expression or the result of a block
                 // we should put its result to the evaluation stack before the return, otherwise we are
                 // somewhere inside the block, so we shouldn't return with the result
+                var flags = parent & ~ParentFlags.IgnoreResult;
                 switch (leftNodeType)
                 {
                     case ExpressionType.Parameter:
@@ -2496,14 +2521,17 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                                 EmitLoadParamArg(il, paramIndex, false);
 
                                 var arithmeticNodeType = Tools.GetArithmeticFromArithmeticAssignOrSelf(nodeType);
-                                if (arithmeticNodeType != nodeType)
+                                if (arithmeticNodeType == nodeType)
                                 {
-                                    if (!TryEmitArithmeticOperation(expr, arithmeticNodeType, exprType, paramExprs, il, ref closure, false, isMemberAccess))
+                                    if (!TryEmit(right, paramExprs, il, ref closure, flags))
                                     {
                                         return false;
                                     }
                                 }
-                                else if (!TryEmit(right, exprType, paramExprs, il, ref closure, ExpressionType.Assign, false, isMemberAccess))
+                                else if (
+                                    !TryEmit(expr.Left, paramExprs, il, ref closure, flags | ParentFlags.Arithmetic) ||
+                                    !TryEmit(expr.Right, paramExprs, il, ref closure, flags | ParentFlags.Arithmetic) ||
+                                    !TryEmitArithmeticOperation(arithmeticNodeType, exprType, il))
                                 {
                                     return false;
                                 }
@@ -2512,12 +2540,12 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                             }
                             else
                             {
-                                if (!TryEmit(right, exprType, paramExprs, il, ref closure, ExpressionType.Assign, false, isMemberAccess))
+                                if (!TryEmit(right, paramExprs, il, ref closure, flags))
                                 {
                                     return false;
                                 }
 
-                                if (!ignoreResult)
+                                if ((parent & ParentFlags.IgnoreResult) == 0)
                                 {
                                     il.Emit(OpCodes.Dup); // dup value to assign and return
                                 }
@@ -2535,7 +2563,9 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                                 var varIdx = closure.CurrentBlock.VarExprs.GetFirstIndex(leftParamExpr);
                                 if (varIdx != -1)
                                 {
-                                    if (!TryEmitArithmeticOperation(expr, arithmeticNodeType, exprType, paramExprs, il, ref closure, false, isMemberAccess))
+                                    if (!TryEmit(expr.Left, paramExprs, il, ref closure, flags | ParentFlags.Arithmetic) ||
+                                        !TryEmit(expr.Right, paramExprs, il, ref closure, flags | ParentFlags.Arithmetic) ||
+                                        !TryEmitArithmeticOperation(arithmeticNodeType, exprType, il))
                                     {
                                         return false;
                                     }
@@ -2557,7 +2587,7 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                         var localVariable = closure.GetDefinedLocalVarOrDefault(leftParamExpr);
                         if (localVariable != null)
                         {
-                            if (!TryEmit(right, exprType, paramExprs, il, ref closure, ExpressionType.Assign, false, isMemberAccess))
+                            if (!TryEmit(right, paramExprs, il, ref closure, flags))
                             {
                                 return false;
                             }
@@ -2567,7 +2597,7 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                                 il.Emit(OpCodes.Ldind_I4);
                             }
 
-                            if (!ignoreResult) // if we have to push the result back, dup the right value
+                            if ((parent & ParentFlags.IgnoreResult) == 0) // if we have to push the result back, dup the right value
                             {
                                 il.Emit(OpCodes.Dup);
                             }
@@ -2587,9 +2617,9 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
 
                         il.Emit(OpCodes.Ldarg_0); // closure is always a first argument
 
-                        if (!ignoreResult)
+                        if ((parent & ParentFlags.IgnoreResult) == 0)
                         {
-                            if (!TryEmit(right, exprType, paramExprs, il, ref closure, ExpressionType.Assign, false, isMemberAccess))
+                            if (!TryEmit(right, paramExprs, il, ref closure, flags))
                             {
                                 return false;
                             }
@@ -2626,7 +2656,7 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                                 EmitLoadConstantInt(il, paramInClosureIndex); // load array item index
                             }
 
-                            if (!TryEmit(right, exprType, paramExprs, il, ref closure, ExpressionType.Assign, false, isMemberAccess))
+                            if (!TryEmit(right, paramExprs, il, ref closure, flags))
                             {
                                 return false;
                             }
@@ -2653,18 +2683,13 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                         var member = memberExpr.Member;
 
                         var objExpr = memberExpr.Expression;
-                        if (objExpr != null &&
-                            !TryEmit(objExpr, objExpr.Type, paramExprs, il, ref closure, ExpressionType.Assign, false, true))
+                        if (objExpr != null && !TryEmit(objExpr, paramExprs, il, ref closure, flags | ParentFlags.MemberAccess) ||
+                            !TryEmit(right, paramExprs, il, ref closure, ParentFlags.Empty))
                         {
                             return false;
                         }
 
-                        if (!TryEmit(right, exprType, paramExprs, il, ref closure, ExpressionType.Assign))
-                        {
-                            return false;
-                        }
-
-                        if (ignoreResult)
+                        if ((parent & ParentFlags.IgnoreResult) != 0)
                         {
                             return EmitMemberAssign(il, member);
                         }
@@ -2686,23 +2711,26 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                         var indexExpr = (IndexExpression)left;
 
                         var obj = indexExpr.Object;
-                        if (obj != null &&
-                            !TryEmit(obj, obj.Type, paramExprs, il, ref closure, ExpressionType.Assign, false, isMemberAccess))
+                        if (obj != null && !TryEmit(obj, paramExprs, il, ref closure, flags))
                         {
                             return false;
                         }
 
-                        if (!TryEmitMany(indexExpr.Arguments, paramExprs, il, ref closure, ExpressionType.Assign, false, isMemberAccess))
+                        var indexArgExprs = indexExpr.Arguments;
+                        for (var i = 0; i < indexArgExprs.Count; i++)
+                        {
+                            if (!TryEmit(indexArgExprs[i], paramExprs, il, ref closure, flags, i))
+                            {
+                                return false;
+                            }
+                        }
+
+                        if (!TryEmit(right, paramExprs, il, ref closure, flags))
                         {
                             return false;
                         }
 
-                        if (!TryEmit(right, exprType, paramExprs, il, ref closure, ExpressionType.Assign, false, isMemberAccess))
-                        {
-                            return false;
-                        }
-
-                        if (ignoreResult)
+                        if ((parent & ParentFlags.IgnoreResult) != 0)
                         {
                             return TryEmitIndexAssign(indexExpr, obj?.Type, exprType, il);
                         }
@@ -2790,87 +2818,56 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
             }
 
             private static bool TryEmitMethodCall(MethodCallExpression expr,
-                IList<ParameterExpression> paramExprs, ILGenerator il, ref ClosureInfo closure,
-                bool ignoreResult, bool isMemberAccess)
+                IList<ParameterExpression> paramExprs, ILGenerator il, ref ClosureInfo closure, ParentFlags parent)
             {
-                var isValueTypeObj = false;
-                Type objType = null;
                 var objExpr = expr.Object;
+                var callFlags = parent & ~ParentFlags.IgnoreResult | ParentFlags.Call;
                 if (objExpr != null)
                 {
-                    objType = objExpr.Type;
-                    if (!TryEmit(objExpr, objType, paramExprs, il, ref closure, ExpressionType.Call, false, isMemberAccess))
+                    if (!TryEmit(objExpr, paramExprs, il, ref closure, callFlags))
                     {
                         return false;
                     }
 
-                    isValueTypeObj = objType.IsValueType();
-                    if (isValueTypeObj && objExpr.NodeType != ExpressionType.Parameter)
+                    if (objExpr.Type.IsValueType() && objExpr.NodeType != ExpressionType.Parameter)
                     {
-                        StoreAsVarAndLoadItsAddress(il, objType);
+                        var theVar = il.DeclareLocal(objExpr.Type);
+                        il.Emit(OpCodes.Stloc, theVar);
+                        il.Emit(OpCodes.Ldloca, theVar);
                     }
                 }
 
-                if (expr.Arguments.Count != 0 &&
-                    !TryEmitMany(MakeByRefParameters(expr, expr.Arguments), paramExprs, il, ref closure, ExpressionType.Call, false, isMemberAccess))
+                IList<Expression> argExprs = expr.Arguments;
+                if (argExprs.Count != 0)
                 {
-                    return false;
-                }
-
-                var method = expr.Method;
-                if (isValueTypeObj && method.IsVirtual)
-                {
-                    il.Emit(OpCodes.Constrained, objType);
-                }
-
-                return EmitMethodCall(il, method, ignoreResult);
-            }
-
-            // if call is done into byref method parameters there is no indicators in tree, so grab that from method
-            // current approach is to copy into new list only if there are by ref with by ref parameters,
-            // possible approach to store hit map of small size (possible 256 bit #89) to check if parameter is by ref
-            // https://stackoverflow.com/questions/12658883/what-is-the-maximum-number-of-parameters-that-a-c-sharp-method-can-be-defined-as
-            private static IList<Expression> MakeByRefParameters(MethodCallExpression expr, IList<Expression> argExprs)
-            {
-                List<Expression> someByRefArguments = null;
-                var methodParams = expr.Method.GetParameters();
-                for (var i = 0; i < methodParams.Length; i++)
-                {
-                    if (methodParams[i].ParameterType.IsByRef)
+                    var args = expr.Method.GetParameters();
+                    for (var i = 0; i < argExprs.Count; i++)
                     {
-                        if (someByRefArguments == null) // copy arguments
+                        var byRefIndex = args[i].ParameterType.IsByRef ? i : -1;
+                        if (!TryEmit(argExprs[i], paramExprs, il, ref closure, callFlags,
+                            byRefIndex))
                         {
-                            someByRefArguments = new List<Expression>(argExprs);
-                        }
-
-                        var paramExpr = argExprs[i] as ParameterExpression;
-                        if (paramExpr != null && !paramExpr.IsByRef)
-                        {
-                            someByRefArguments[i] = Expression.Parameter(paramExpr.Type.MakeByRefType(), paramExpr.Name);
+                            return false;
                         }
                     }
                 }
 
-                return someByRefArguments ?? argExprs;
-            }
+                if (expr.Method.IsVirtual && objExpr?.Type.IsValueType() == true)
+                {
+                    il.Emit(OpCodes.Constrained, objExpr.Type);
+                }
 
-            private static void StoreAsVarAndLoadItsAddress(ILGenerator il, Type varType)
-            {
-                var theVar = il.DeclareLocal(varType);
-                il.Emit(OpCodes.Stloc, theVar);
-                il.Emit(OpCodes.Ldloca, theVar);
+                return EmitMethodCall(il, expr.Method, parent);
             }
 
             private static bool TryEmitMemberAccess(MemberExpression expr,
-                IList<ParameterExpression> paramExprs, ILGenerator il, ref ClosureInfo closure,
-                bool ignoreResult)
+                IList<ParameterExpression> paramExprs, ILGenerator il, ref ClosureInfo closure, ParentFlags parent)
             {
                 var prop = expr.Member as PropertyInfo;
                 var instanceExpr = expr.Expression;
                 if (instanceExpr != null &&
-                    !TryEmit(instanceExpr, instanceExpr.Type, paramExprs, il, ref closure,
-                        //prop != null ? ExpressionType.Call : ExpressionType.MemberAccess, 
-                        ExpressionType.MemberAccess, ignoreResult, true))
+                    !TryEmit(instanceExpr, paramExprs, il, ref closure,
+                        parent | (prop != null ? ParentFlags.Call : parent) | ParentFlags.MemberAccess))
                 {
                     return false;
                 }
@@ -2882,7 +2879,9 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                     // And for field access no need to load address, cause the field stored on stack nearby
                     if (instanceExpr != null && instanceExpr.NodeType != ExpressionType.Parameter && instanceExpr.Type.IsValueType())
                     {
-                        StoreAsVarAndLoadItsAddress(il, instanceExpr.Type);
+                        var theVar = il.DeclareLocal(instanceExpr.Type);
+                        il.Emit(OpCodes.Stloc, theVar);
+                        il.Emit(OpCodes.Ldloca, theVar);
                     }
 
                     return EmitMethodCall(il, prop.GetGetter());
@@ -3096,46 +3095,34 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
             }
 
             private static bool TryEmitInvoke(InvocationExpression expr,
-                IList<ParameterExpression> paramExprs, ILGenerator il, ref ClosureInfo closure,
-                bool ignoreResult, bool isMemberAccess)
+                IList<ParameterExpression> paramExprs, ILGenerator il, ref ClosureInfo closure, ParentFlags parent)
             {
-                var lambda = expr.Expression;
                 // optimization #138: we are inlining invoked lambda body (only for lambdas without arguments) 
-                return lambda is LambdaExpression lambdaExpr && lambdaExpr.Parameters.Count == 0
-                    ? TryEmit(lambdaExpr.Body, lambdaExpr.Body.Type, paramExprs, il, ref closure, ExpressionType.Invoke, ignoreResult, isMemberAccess)
-                    : (TryEmit(lambda, lambda.Type, paramExprs, il, ref closure, ExpressionType.Invoke, ignoreResult, isMemberAccess) &&
-                       TryEmitMany(expr.Arguments, paramExprs, il, ref closure, ExpressionType.Invoke, false, isMemberAccess) &&
-                       EmitMethodCall(il, lambda.Type.FindDelegateInvokeMethod(), ignoreResult));
-            }
-
-            private static bool TryEmitInvertedNullComparison(Expression expr,
-                IList<ParameterExpression> paramExprs, ILGenerator il, ref ClosureInfo closure,
-                bool ignoreResult, bool isMemberAccess)
-            {
-                if (expr is BinaryExpression b)
+                var lambda = expr.Expression;
+                if (lambda is LambdaExpression lambdaExpr && lambdaExpr.Parameters.Count == 0)
                 {
-                    if (expr.NodeType != ExpressionType.Equal && expr.NodeType != ExpressionType.NotEqual)
-                    {
-                        return false;
-                    }
-
-                    if (b.Left.Type.IsNullable() || b.Right.Type.IsNullable())
-                    {
-                        return false;
-                    }
-
-                    return b.Right is ConstantExpression r && r.Value == null
-                        ? TryEmit(b.Left, b.Left.Type, paramExprs, il, ref closure, ExpressionType.Default, ignoreResult, isMemberAccess)
-                        : b.Left is ConstantExpression l && l.Value == null &&
-                          TryEmit(b.Right, b.Right.Type, paramExprs, il, ref closure, ExpressionType.Default, ignoreResult, isMemberAccess);
+                    return TryEmit(lambdaExpr.Body, paramExprs, il, ref closure, parent);
                 }
 
-                return false;
+                if (!TryEmit(lambda, paramExprs, il, ref closure, parent))
+                {
+                    return false;
+                }
+
+                var argExprs = expr.Arguments;
+                for (var i = 0; i < argExprs.Count; i++)
+                {
+                    if (!TryEmit(argExprs[i], paramExprs, il, ref closure, parent & ~ParentFlags.IgnoreResult, i))
+                    {
+                        return false;
+                    }
+                }
+
+                return EmitMethodCall(il, lambda.Type.FindDelegateInvokeMethod(), parent);
             }
 
             private static bool TryEmitSwitch(SwitchExpression expr,
-                IList<ParameterExpression> paramExprs, ILGenerator il, ref ClosureInfo closure,
-                bool ignoreResult, bool isMemberAccess)
+                IList<ParameterExpression> paramExprs, ILGenerator il, ref ClosureInfo closure, ParentFlags parent)
             {
                 // todo:
                 //- use switch statement for int comparison (if int difference is less or equal 3 -> use il switch)
@@ -3153,7 +3140,7 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                     foreach (var switchCaseTestValue in switchCase.TestValues)
                     {
                         if (!TryEmitComparison(expr.SwitchValue, switchCaseTestValue, ExpressionType.Equal, paramExprs, il,
-                            ref closure, ignoreResult, isMemberAccess))
+                            ref closure, parent))
                         {
                             return false;
                         }
@@ -3164,8 +3151,7 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
 
                 if (expr.DefaultBody != null)
                 {
-                    if (!TryEmit(expr.DefaultBody, expr.DefaultBody.Type, paramExprs, il, ref closure,
-                        ExpressionType.Switch, ignoreResult, isMemberAccess))
+                    if (!TryEmit(expr.DefaultBody, paramExprs, il, ref closure, parent))
                     {
                         return false;
                     }
@@ -3177,8 +3163,7 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                 {
                     var switchCase = expr.Cases[index];
                     il.MarkLabel(labels[index]);
-                    if (!TryEmit(switchCase.Body, switchCase.Body.Type, paramExprs, il, ref closure,
-                        ExpressionType.Switch, ignoreResult, isMemberAccess))
+                    if (!TryEmit(switchCase.Body, paramExprs, il, ref closure, parent))
                     {
                         return false;
                     }
@@ -3195,8 +3180,7 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
             }
 
             private static bool TryEmitComparison(Expression exprLeft, Expression exprRight, ExpressionType expressionType,
-                IList<ParameterExpression> paramExprs, ILGenerator il, ref ClosureInfo closure,
-                bool ignoreResult, bool isMemberAccess)
+                IList<ParameterExpression> paramExprs, ILGenerator il, ref ClosureInfo closure, ParentFlags parent)
             {
                 // todo: for now, handling only parameters of the same type
                 // todo: for now, Nullable is not supported
@@ -3214,7 +3198,7 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                 }
 
                 LocalBuilder lVar = null, rVar = null;
-                if (!TryEmit(exprLeft, exprLeft.Type, paramExprs, il, ref closure, ExpressionType.Default, ignoreResult, isMemberAccess))
+                if (!TryEmit(exprLeft, paramExprs, il, ref closure, parent))
                 {
                     return false;
                 }
@@ -3225,8 +3209,7 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                     il.Emit(OpCodes.Stloc_S, lVar);
                     il.Emit(OpCodes.Ldloca_S, lVar);
 
-                    var getValueMethod = leftOpType.GetPublicInstanceMethod("GetValueOrDefault", parameterCount: 0);
-                    if (!EmitMethodCall(il, getValueMethod))
+                    if (!EmitMethodCall(il, leftOpType.FindNullableValueOrDefaultMethod()))
                     {
                         return false;
                     }
@@ -3234,7 +3217,7 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                     leftOpType = Nullable.GetUnderlyingType(leftOpType);
                 }
 
-                if (!TryEmit(exprRight, exprRight.Type, paramExprs, il, ref closure, ExpressionType.Default, ignoreResult, isMemberAccess))
+                if (!TryEmit(exprRight, paramExprs, il, ref closure, parent))
                 {
                     return false;
                 }
@@ -3244,8 +3227,7 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                     rVar = il.DeclareLocal(rightOpType);
                     il.Emit(OpCodes.Stloc_S, rVar);
                     il.Emit(OpCodes.Ldloca_S, rVar);
-                    var mthValue = rightOpType.GetPublicInstanceMethod("GetValueOrDefault", parameterCount: 0);
-                    if (!EmitMethodCall(il, mthValue))
+                    if (!EmitMethodCall(il, rightOpType.FindNullableValueOrDefaultMethod()))
                     {
                         return false;
                     }
@@ -3259,7 +3241,8 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                         : expressionType == ExpressionType.GreaterThan ? "op_GreaterThan"
                         : expressionType == ExpressionType.GreaterThanOrEqual ? "op_GreaterThanOrEqual"
                         : expressionType == ExpressionType.LessThan ? "op_LessThan"
-                        : expressionType == ExpressionType.LessThanOrEqual ? "op_LessThanOrEqual" : null;
+                        : expressionType == ExpressionType.LessThanOrEqual ? "op_LessThanOrEqual"
+                        : null;
 
                     if (methodName == null)
                     {
@@ -3337,7 +3320,7 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                 if (leftIsNull)
                 {
                     il.Emit(OpCodes.Ldloca_S, lVar);
-                    var hasValueMethod = exprLeft.Type.GetPublicInstanceMethod("get_HasValue");
+                    var hasValueMethod = exprLeft.Type.FindNullableHasValueGetterMethod();
                     if (!EmitMethodCall(il, hasValueMethod))
                     {
                         return false;
@@ -3381,16 +3364,8 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                 return true;
             }
 
-            private static bool TryEmitArithmeticOperation(
-                BinaryExpression expr, ExpressionType exprNodeType, Type exprType,
-                IList<ParameterExpression> paramExprs, ILGenerator il, ref ClosureInfo closure,
-                bool ignoreResult, bool isMemberAccess)
+            private static bool TryEmitArithmeticOperation(ExpressionType exprNodeType, Type exprType, ILGenerator il)
             {
-                if (!EmitBinary(expr, paramExprs, il, ref closure, exprNodeType, ignoreResult, isMemberAccess))
-                {
-                    return false;
-                }
-
                 if (!exprType.IsPrimitive())
                 {
                     var methodName
@@ -3404,13 +3379,7 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                         : exprNodeType == ExpressionType.Modulo ? "op_Modulus"
                         : null;
 
-                    if (methodName == null)
-                    {
-                        return false;
-                    }
-
-                    var method = exprType.GetPublicStaticMethod(methodName);
-                    return method != null && EmitMethodCall(il, method);
+                    return methodName != null && EmitMethodCall(il, exprType.GetPublicStaticMethod(methodName));
                 }
 
                 switch (exprNodeType)
@@ -3493,21 +3462,17 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
             }
 
             private static bool TryEmitLogicalOperator(BinaryExpression expr,
-                IList<ParameterExpression> paramExprs, ILGenerator il, ref ClosureInfo closure,
-                bool ignoreResult, bool isMemberAccess)
+                IList<ParameterExpression> paramExprs, ILGenerator il, ref ClosureInfo closure, ParentFlags parent)
             {
-                var leftExpr = expr.Left;
-                if (!TryEmit(leftExpr, leftExpr.Type, paramExprs, il, ref closure, ExpressionType.Default, ignoreResult, isMemberAccess))
+                if (!TryEmit(expr.Left, paramExprs, il, ref closure, parent))
                 {
                     return false;
                 }
 
                 var labelSkipRight = il.DefineLabel();
-                var isAnd = expr.NodeType == ExpressionType.AndAlso;
-                il.Emit(isAnd ? OpCodes.Brfalse : OpCodes.Brtrue, labelSkipRight);
+                il.Emit(expr.NodeType == ExpressionType.AndAlso ? OpCodes.Brfalse : OpCodes.Brtrue, labelSkipRight);
 
-                var rightExpr = expr.Right;
-                if (!TryEmit(rightExpr, rightExpr.Type, paramExprs, il, ref closure, ExpressionType.Default, ignoreResult, isMemberAccess))
+                if (!TryEmit(expr.Right, paramExprs, il, ref closure, parent))
                 {
                     return false;
                 }
@@ -3516,23 +3481,30 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                 il.Emit(OpCodes.Br, labelDone);
 
                 il.MarkLabel(labelSkipRight); // label the second branch
-                il.Emit(isAnd ? OpCodes.Ldc_I4_0 : OpCodes.Ldc_I4_1);
+                il.Emit(expr.NodeType == ExpressionType.AndAlso ? OpCodes.Ldc_I4_0 : OpCodes.Ldc_I4_1);
                 il.MarkLabel(labelDone);
 
                 return true;
             }
 
             private static bool TryEmitConditional(ConditionalExpression expr,
-                IList<ParameterExpression> paramExprs, ILGenerator il, ref ClosureInfo closure, bool ignoreResult, bool isMemberAccess)
+                IList<ParameterExpression> paramExprs, ILGenerator il, ref ClosureInfo closure, ParentFlags parent)
             {
                 var testExpr = expr.Test;
                 var usedInverted = false;
 
-                if (TryEmitInvertedNullComparison(testExpr, paramExprs, il, ref closure, false, isMemberAccess))
+                // optimization: special handling of comparing with null
+                if (testExpr is BinaryExpression b &&
+                    ((testExpr.NodeType == ExpressionType.Equal || testExpr.NodeType == ExpressionType.NotEqual) &&
+                     !(b.Left.Type.IsNullable() || b.Right.Type.IsNullable()) &&
+                      b.Right is ConstantExpression r && r.Value == null
+                    ? TryEmit(b.Left, paramExprs, il, ref closure, parent & ~ParentFlags.IgnoreResult)
+                    : b.Left is ConstantExpression l && l.Value == null &&
+                      TryEmit(b.Right, paramExprs, il, ref closure, parent & ~ParentFlags.IgnoreResult)))
                 {
                     usedInverted = true;
                 }
-                else if (!TryEmit(testExpr, testExpr.Type, paramExprs, il, ref closure, ExpressionType.Conditional, false, isMemberAccess))
+                else if (!TryEmit(testExpr, paramExprs, il, ref closure, parent & ~ParentFlags.IgnoreResult))
                 {
                     return false;
                 }
@@ -3541,8 +3513,7 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                 il.Emit(usedInverted && testExpr.NodeType == ExpressionType.Equal ? OpCodes.Brtrue : OpCodes.Brfalse, labelIfFalse);
 
                 var ifTrueExpr = expr.IfTrue;
-                if (!TryEmit(ifTrueExpr, ifTrueExpr.Type, paramExprs, il, ref closure, ExpressionType.Conditional,
-                    ignoreResult, isMemberAccess))
+                if (!TryEmit(ifTrueExpr, paramExprs, il, ref closure, parent))
                 {
                     return false;
                 }
@@ -3550,17 +3521,10 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                 var labelDone = il.DefineLabel();
                 var ifFalseExpr = expr.IfFalse;
 
-                if (ifFalseExpr.NodeType == ExpressionType.Default)
-                {
-                    il.MarkLabel(labelIfFalse);
-                    return true;
-                }
-
                 il.Emit(OpCodes.Br, labelDone);
 
                 il.MarkLabel(labelIfFalse);
-                if (!TryEmit(ifFalseExpr, ifFalseExpr.Type, paramExprs, il, ref closure, ExpressionType.Conditional,
-                    ignoreResult, isMemberAccess))
+                if (!TryEmit(ifFalseExpr, paramExprs, il, ref closure, parent))
                 {
                     return false;
                 }
@@ -3569,7 +3533,7 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                 return true;
             }
 
-            private static bool EmitMethodCall(ILGenerator il, MethodInfo method, bool ignoreResult = false)
+            private static bool EmitMethodCall(ILGenerator il, MethodInfo method, ParentFlags parent = ParentFlags.Empty)
             {
                 if (method == null)
                 {
@@ -3578,7 +3542,7 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
 
                 il.Emit(method.IsVirtual ? OpCodes.Callvirt : OpCodes.Call, method);
 
-                if (ignoreResult && method.ReturnType != typeof(void))
+                if ((parent & ParentFlags.IgnoreResult) != 0 && method.ReturnType != typeof(void))
                 {
                     il.Emit(OpCodes.Pop);
                 }
@@ -3640,22 +3604,13 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
         internal static MethodInfo FindDelegateInvokeMethod(this Type type) =>
             type.GetPublicInstanceMethod("Invoke");
 
+        internal static MethodInfo FindNullableValueOrDefaultMethod(this Type type) =>
+            type.GetPublicInstanceMethod("GetValueOrDefault", parameterCount: 0);
+
+        internal static MethodInfo FindNullableHasValueGetterMethod(this Type type) =>
+            type.GetPublicInstanceMethod("get_HasValue");
+
         // todo: test what is faster? Copy and inline switch? Switch in method? Ors in method?
-        internal static bool IsArithmetic(ExpressionType arithmetic)
-            => arithmetic == ExpressionType.Add
-               || arithmetic == ExpressionType.AddChecked
-               || arithmetic == ExpressionType.Subtract
-               || arithmetic == ExpressionType.SubtractChecked
-               || arithmetic == ExpressionType.Multiply
-               || arithmetic == ExpressionType.MultiplyChecked
-               || arithmetic == ExpressionType.Divide
-               || arithmetic == ExpressionType.Modulo
-               || arithmetic == ExpressionType.Power
-               || arithmetic == ExpressionType.And
-               || arithmetic == ExpressionType.Or
-               || arithmetic == ExpressionType.ExclusiveOr
-               || arithmetic == ExpressionType.LeftShift
-               || arithmetic == ExpressionType.RightShift;
 
         internal static ExpressionType GetArithmeticFromArithmeticAssignOrSelf(ExpressionType arithmetic)
         {
@@ -3677,30 +3632,6 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                 case ExpressionType.RightShiftAssign: return ExpressionType.RightShift;
                 default: return arithmetic;
             }
-        }
-
-        public static T[] WithLast<T>(this T[] source, T value)
-        {
-            if (source == null || source.Length == 0)
-            {
-                return new[] { value };
-            }
-
-            if (source.Length == 1)
-            {
-                return new[] { source[0], value };
-            }
-
-            if (source.Length == 2)
-            {
-                return new[] { source[0], source[1], value };
-            }
-
-            var sourceLength = source.Length;
-            var result = new T[sourceLength + 1];
-            Array.Copy(source, result, sourceLength);
-            result[sourceLength] = value;
-            return result;
         }
 
         public static Type[] GetParamTypes(IList<ParameterExpression> paramExprs)
@@ -3745,7 +3676,7 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                 }
             }
 
-            paramTypes = paramTypes.WithLast(returnType);
+            paramTypes = paramTypes.Append(returnType);
             switch (paramTypes.Length)
             {
                 case 1: return typeof(Func<>).MakeGenericType(paramTypes);
@@ -3762,7 +3693,7 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
             }
         }
 
-        public static int GetFirstIndex<TItems, TItem>(this IList<TItems> source, TItem item)
+        public static int GetFirstIndex<TElement, TItem>(this IList<TElement> source, TItem item)
         {
             if (source == null || source.Count == 0)
             {
