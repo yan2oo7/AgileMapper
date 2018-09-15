@@ -3308,7 +3308,7 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                     return TryEmit(lambdaExpr.Body, paramExprs, il, ref closure, parent);
                 }
 
-                if (!TryEmit(lambda, paramExprs, il, ref closure, parent))
+                if (!TryEmit(lambda, paramExprs, il, ref closure, parent & ~ParentFlags.IgnoreResult))
                 {
                     return false;
                 }
