@@ -1310,6 +1310,7 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                             return ShouldIgnoreResult(parent) ||
                                    TryEmitParameter((ParameterExpression)expr, paramExprs, il, ref closure, parent,
                                        byRefIndex);
+
                         case ExpressionType.TypeAs:
                             return TryEmitTypeAs((UnaryExpression)expr, paramExprs, il, ref closure, parent);
 
@@ -1827,8 +1828,8 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
 
                     var asAddress =
                         paramType.IsValueType() && !paramExpr.IsByRef &&
-                      ((parent & (ParentFlags.Call | ParentFlags.InstanceAccess)) == (ParentFlags.Call | ParentFlags.InstanceAccess) ||
-                       (parent & ParentFlags.MemberAccess) != 0);
+                        ((parent & (ParentFlags.Call | ParentFlags.InstanceAccess)) == (ParentFlags.Call | ParentFlags.InstanceAccess) ||
+                        (parent & ParentFlags.MemberAccess) != 0);
 
                     EmitLoadParamArg(il, paramIndex, asAddress);
 
@@ -3537,16 +3538,24 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                         il.Emit(OpCodes.Cgt);
                         break;
 
-                    case ExpressionType.LessThanOrEqual:
-                        il.Emit(OpCodes.Cgt);
-                        il.Emit(OpCodes.Ldc_I4_0);
-                        il.Emit(OpCodes.Ceq);
-                        break;
-
                     case ExpressionType.GreaterThanOrEqual:
-                        il.Emit(OpCodes.Clt);
+                    case ExpressionType.LessThanOrEqual:
+                        var l1 = il.DefineLabel();
+                        var l2 = il.DefineLabel();
+                        if (rightOpType == typeof(uint) || rightOpType == typeof(ulong) || rightOpType == typeof(ushort) || rightOpType == typeof(byte))
+                        {
+                            il.Emit(expressionType == ExpressionType.GreaterThanOrEqual ? OpCodes.Bge_Un_S : OpCodes.Ble_Un_S, l1);
+                        }
+                        else
+                        {
+                            il.Emit(expressionType == ExpressionType.GreaterThanOrEqual ? OpCodes.Bge_S : OpCodes.Ble_S, l1);
+                        }
+
                         il.Emit(OpCodes.Ldc_I4_0);
-                        il.Emit(OpCodes.Ceq);
+                        il.Emit(OpCodes.Br_S, l2);
+                        il.MarkLabel(l1);
+                        il.Emit(OpCodes.Ldc_I4_1);
+                        il.MarkLabel(l2);
                         break;
 
                     default:
