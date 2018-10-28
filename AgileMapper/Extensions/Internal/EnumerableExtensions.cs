@@ -207,6 +207,11 @@
 
         public static T[] Append<T>(this T[] array, T extraItem)
         {
+            if (array == null)
+            {
+                return new[] { extraItem };
+            }
+
             switch (array.Length)
             {
                 case 0:
