@@ -343,7 +343,7 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
             public NestedLambdaInfo[] NestedLambdas;
             public LambdaExpression[] NestedLambdaExprs;
 
-            public int ClosedItemCount 
+            public int ClosedItemCount
                 => Constants.Length + NonPassedParameters.Length + NestedLambdas.Length;
 
             // FieldInfos are needed to load field of closure object on stack in emitter.
@@ -1275,7 +1275,7 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
             public static bool TryEmit(
                 Expression expr,
                 IList<ParameterExpression> paramExprs,
-                ILGenerator il, 
+                ILGenerator il,
                 ref ClosureInfo closure,
                 ParentFlags parent,
                 int byRefIndex = -1)
@@ -1786,8 +1786,8 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
 
             private static bool TryEmitParameter(
                 ParameterExpression paramExpr,
-                IList<ParameterExpression> paramExprs, 
-                ILGenerator il, 
+                IList<ParameterExpression> paramExprs,
+                ILGenerator il,
                 ref ClosureInfo closure,
                 ParentFlags parent,
                 int byRefIndex = -1)
@@ -2003,7 +2003,7 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                     il.Emit(OpCodes.Ldnull);
                     il.Emit(OpCodes.Cgt_Un);
                 }
-                
+
                 return true;
             }
 
@@ -2067,7 +2067,7 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                 var targetTypeIsNullable = underlyingNullableTargetType != targetType;
                 if (targetTypeIsNullable && sourceType == underlyingNullableTargetType)
                 {
-                    il.Emit(OpCodes.Newobj, targetType.GetPublicInstanceConstructor());
+                    il.Emit(OpCodes.Newobj, targetType.GetPublicInstanceConstructor(underlyingNullableTargetType));
                     return true;
                 }
 
@@ -3431,7 +3431,6 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                 IList<ParameterExpression> paramExprs, ILGenerator il, ref ClosureInfo closure, ParentFlags parent)
             {
                 var leftOpType = exprLeft.Type;
-                var leftIsNull = leftOpType.IsNullable();
                 var rightOpType = exprRight.Type;
                 if (exprRight is ConstantExpression c && c.Value == null && exprRight.Type == typeof(object))
                 {
@@ -3444,6 +3443,9 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                     return false;
                 }
 
+                var leftUnderlyingNullableType = leftOpType.GetNonNullableType();
+                var leftIsNull = leftUnderlyingNullableType != leftOpType;
+
                 if (leftIsNull)
                 {
                     lVar = DeclareAndLoadLocalVariable(il, leftOpType);
@@ -3452,7 +3454,7 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                         return false;
                     }
 
-                    leftOpType = Nullable.GetUnderlyingType(leftOpType);
+                    leftOpType = leftUnderlyingNullableType;
                 }
 
                 if (!TryEmit(exprRight, paramExprs, il, ref closure, parent & ~ParentFlags.IgnoreResult & ~ParentFlags.InstanceAccess))
@@ -3763,14 +3765,19 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
             private static bool TryEmitArithmeticOperation(BinaryExpression expr,
                 ExpressionType exprNodeType, Type exprType, ILGenerator il)
             {
-                if (!exprType.IsPrimitive())
+                var isPrimitive = exprType.IsPrimitive();
+
+                if (!isPrimitive)
                 {
-                    if (exprType.IsNullable())
+                    var exprUnderlyingNullableType = Nullable.GetUnderlyingType(exprType);
+
+                    if (exprUnderlyingNullableType != null)
                     {
-                        exprType = Nullable.GetUnderlyingType(exprType);
+                        exprType = exprUnderlyingNullableType;
+                        isPrimitive = exprType.IsPrimitive();
                     }
 
-                    if (!exprType.IsPrimitive())
+                    if (!isPrimitive)
                     {
                         MethodInfo method = null;
                         if (exprType == typeof(string))
@@ -4021,8 +4028,7 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
         internal static bool IsUnsigned(this Type type) =>
             type == typeof(byte) || type == typeof(ushort) || type == typeof(uint) || type == typeof(ulong);
 
-        internal static bool IsNullable(this Type type) =>
-            type.GetTypeInfo().IsGenericType && type.GetTypeInfo().GetGenericTypeDefinition() == typeof(Nullable<>);
+        internal static bool IsNullable(this Type type) => Nullable.GetUnderlyingType(type) != null;
 
         internal static MethodInfo FindDelegateInvokeMethod(this Type type) =>
             type.GetPublicInstanceMethod("Invoke");
@@ -4037,7 +4043,7 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
             type.GetPublicInstanceMethod("get_HasValue");
 
         internal static MethodInfo FindConvertOperator(this Type type, Type sourceType, Type targetType) =>
-            type.GetOperators().First(m => m.ReturnType == targetType && m.GetParameters()[0].ParameterType == sourceType);
+            type.GetOperators().FirstOrDefault(m => m.ReturnType == targetType && m.GetParameters()[0].ParameterType == sourceType);
 
         // todo: test what is faster? Copy and inline switch? Switch in method? Ors in method?
         internal static ExpressionType GetArithmeticFromArithmeticAssignOrSelf(ExpressionType arithmetic)
