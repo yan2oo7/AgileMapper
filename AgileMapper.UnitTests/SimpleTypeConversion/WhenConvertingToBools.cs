@@ -150,7 +150,7 @@
         }
 
         [Fact]
-        public void ShouldMapAnDecimalOneToANullableBool()
+        public void ShouldMapADecimalOneToANullableBool()
         {
             var source = new PublicGetMethod<decimal>(1);
             var result = Mapper.Map(source).ToANew<PublicProperty<bool?>>();
@@ -168,7 +168,7 @@
         }
 
         [Fact]
-        public void ShouldMapANullableDecimalZeroOverABool()
+        public void ShouldMapADecimalZeroOverABool()
         {
             var source = new PublicProperty<decimal> { Value = decimal.Zero };
             var target = Mapper.Map(source).Over(new PublicProperty<bool> { Value = true });

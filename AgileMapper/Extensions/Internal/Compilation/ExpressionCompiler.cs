@@ -2043,19 +2043,27 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                 var sourceType = opExpr.Type;
                 var underlyingNullableSourceType = sourceType.GetNonNullableType();
                 var sourceTypeIsNullable = underlyingNullableSourceType != sourceType;
-                if (sourceTypeIsNullable && targetType == underlyingNullableSourceType)
+
+                if (sourceTypeIsNullable)
                 {
-                    if (!TryEmit(opExpr, paramExprs, il, ref closure, parent & ~ParentFlags.IgnoreResult | ParentFlags.InstanceAccess))
+                    if (targetType == underlyingNullableSourceType)
                     {
-                        return false;
-                    }
+                        if (!TryEmit(opExpr, paramExprs, il, ref closure, parent & ~ParentFlags.IgnoreResult | ParentFlags.InstanceAccess))
+                        {
+                            return false;
+                        }
 
-                    if (!closure.LastEmitIsAddress)
-                    {
-                        DeclareAndLoadLocalVariable(il, sourceType);
-                    }
+                        if (!closure.LastEmitIsAddress)
+                        {
+                            DeclareAndLoadLocalVariable(il, sourceType);
+                        }
 
-                    return EmitMethodCall(il, sourceType.FindValueGetterMethod(), parent);
+                        return EmitMethodCall(il, sourceType.FindValueGetterMethod(), parent);
+                    }
+                }
+                else
+                {
+                    underlyingNullableSourceType = null;
                 }
 
                 if (!TryEmit(opExpr, paramExprs, il, ref closure, parent & ~ParentFlags.IgnoreResult & ~ParentFlags.InstanceAccess))
@@ -2065,10 +2073,17 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
 
                 var underlyingNullableTargetType = targetType.GetNonNullableType();
                 var targetTypeIsNullable = underlyingNullableTargetType != targetType;
-                if (targetTypeIsNullable && sourceType == underlyingNullableTargetType)
+                if (targetTypeIsNullable)
                 {
-                    il.Emit(OpCodes.Newobj, targetType.GetPublicInstanceConstructor(underlyingNullableTargetType));
-                    return true;
+                    if (sourceType == underlyingNullableTargetType)
+                    {
+                        il.Emit(OpCodes.Newobj, targetType.GetPublicInstanceConstructor(underlyingNullableTargetType));
+                        return true;
+                    }
+                }
+                else
+                {
+                    underlyingNullableTargetType = null;
                 }
 
                 if (sourceType == targetType || targetType == typeof(object))
@@ -4037,10 +4052,10 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
             type.GetPublicInstanceMethod("GetValueOrDefault", parameterCount: 0);
 
         internal static MethodInfo FindValueGetterMethod(this Type type) =>
-            type.GetPublicInstanceMethod("get_Value");
+            type.GetPublicInstanceProperty("Value").GetGetter();
 
         internal static MethodInfo FindNullableHasValueGetterMethod(this Type type) =>
-            type.GetPublicInstanceMethod("get_HasValue");
+            type.GetPublicInstanceProperty("HasValue").GetGetter();
 
         internal static MethodInfo FindConvertOperator(this Type type, Type sourceType, Type targetType) =>
             type.GetOperators().FirstOrDefault(m => m.ReturnType == targetType && m.GetParameters()[0].ParameterType == sourceType);
