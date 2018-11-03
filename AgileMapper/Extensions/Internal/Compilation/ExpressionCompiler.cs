@@ -222,10 +222,8 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
             return method.CreateDelegate(delegateType, closureObject);
         }
 
-        private static void CopyNestedClosureInfo(
-            IList<ParameterExpression> lambdaParamExprs,
-            ref ClosureInfo info,
-            ref ClosureInfo nestedInfo)
+        private static void CopyNestedClosureInfo(IList<ParameterExpression> lambdaParamExprs,
+            ref ClosureInfo info, ref ClosureInfo nestedInfo)
         {
             // if nested non passed parameter is no matched with any outer passed parameter, 
             // then ensure it goes to outer non passed parameter.
@@ -343,8 +341,7 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
             public NestedLambdaInfo[] NestedLambdas;
             public LambdaExpression[] NestedLambdaExprs;
 
-            public int ClosedItemCount
-                => Constants.Length + NonPassedParameters.Length + NestedLambdas.Length;
+            public int ClosedItemCount => Constants.Length + NonPassedParameters.Length + NestedLambdas.Length;
 
             // FieldInfos are needed to load field of closure object on stack in emitter.
             // It is also an indicator that we use typed Closure object and not an array.
@@ -534,16 +531,10 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                 return constructTypeOnly ? null : createClosure.Invoke(null, fieldValues);
             }
 
-            public void PushBlock(
-                IList<ParameterExpression> blockVarExprs,
-                LocalBuilder[] localVars)
-            {
+            public void PushBlock(IList<ParameterExpression> blockVarExprs, LocalBuilder[] localVars) =>
                 CurrentBlock = new BlockInfo(CurrentBlock, blockVarExprs, localVars);
-            }
 
-            public void PushBlockAndConstructLocalVars(
-                IList<ParameterExpression> blockVarExprs,
-                ILGenerator il)
+            public void PushBlockAndConstructLocalVars(IList<ParameterExpression> blockVarExprs, ILGenerator il)
             {
                 LocalBuilder[] localVars;
                 if (blockVarExprs.Count != 0)
@@ -562,7 +553,8 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                 CurrentBlock = new BlockInfo(CurrentBlock, blockVarExprs, localVars);
             }
 
-            public void PopBlock() => CurrentBlock = CurrentBlock.Parent;
+            public void PopBlock() =>
+                CurrentBlock = CurrentBlock.Parent;
 
             public bool IsLocalVar(Expression varParamExpr)
             {
@@ -908,11 +900,9 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
 
         #region Collect Bound Constants
 
-        private static bool IsClosureBoundConstant(object value, Type type)
-        {
-            return value is Delegate ||
-                   !type.IsPrimitive() && !type.IsEnum() && !(value is string) && !(value is Type) && !(value is decimal);
-        }
+        private static bool IsClosureBoundConstant(object value, Type type) =>
+            value is Delegate ||
+            !type.IsPrimitive() && !type.IsEnum() && !(value is string) && !(value is Type) && !(value is decimal);
 
         // @paramExprs is required for nested lambda compilation
         private static bool TryCollectBoundConstants(ref ClosureInfo closure, Expression expr, IList<ParameterExpression> paramExprs)
@@ -1180,9 +1170,7 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
             return true;
         }
 
-        private static bool TryCollectTryExprConstants(
-            ref ClosureInfo closure,
-            TryExpression tryExpr,
+        private static bool TryCollectTryExprConstants(ref ClosureInfo closure, TryExpression tryExpr,
             IList<ParameterExpression> paramExprs)
         {
             if (!TryCollectBoundConstants(ref closure, tryExpr.Body, paramExprs))
@@ -1223,9 +1211,7 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
             return finallyExpr == null || TryCollectBoundConstants(ref closure, finallyExpr, paramExprs);
         }
 
-        private static bool TryCollectBoundConstants(
-            ref ClosureInfo closure,
-            IList<Expression> exprs,
+        private static bool TryCollectBoundConstants(ref ClosureInfo closure, IList<Expression> exprs,
             IList<ParameterExpression> paramExprs)
         {
             for (var i = 0; i < exprs.Count; i++)
@@ -1272,13 +1258,8 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
             private static readonly MethodInfo _objectEqualsMethod = ((Func<object, object, bool>)object.Equals).Method;
 #endif
 
-            public static bool TryEmit(
-                Expression expr,
-                IList<ParameterExpression> paramExprs,
-                ILGenerator il,
-                ref ClosureInfo closure,
-                ParentFlags parent,
-                int byRefIndex = -1)
+            public static bool TryEmit(Expression expr, IList<ParameterExpression> paramExprs,
+                ILGenerator il, ref ClosureInfo closure, ParentFlags parent, int byRefIndex = -1)
             {
                 while (true)
                 {
@@ -1487,12 +1468,8 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                 }
             }
 
-            private static bool TryEmitLabel(
-                LabelExpression expr,
-                IList<ParameterExpression> paramExprs,
-                ILGenerator il,
-                ref ClosureInfo closure,
-                ParentFlags parent)
+            private static bool TryEmitLabel(LabelExpression expr,
+                IList<ParameterExpression> paramExprs, ILGenerator il, ref ClosureInfo closure, ParentFlags parent)
             {
                 var index = closure.Labels.GetFirstIndex(x => x.Key == expr.Target);
                 if (index == -1)
@@ -1784,13 +1761,9 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                 return true;
             }
 
-            private static bool TryEmitParameter(
-                ParameterExpression paramExpr,
-                IList<ParameterExpression> paramExprs,
-                ILGenerator il,
-                ref ClosureInfo closure,
-                ParentFlags parent,
-                int byRefIndex = -1)
+            private static bool TryEmitParameter(ParameterExpression paramExpr,
+                IList<ParameterExpression> paramExprs, ILGenerator il, ref ClosureInfo closure,
+                ParentFlags parent, int byRefIndex = -1)
             {
                 // if parameter is passed through, then just load it on stack
                 var paramType = paramExpr.Type;
@@ -2048,7 +2021,8 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                 {
                     if (targetType == underlyingNullableSourceType)
                     {
-                        if (!TryEmit(opExpr, paramExprs, il, ref closure, parent & ~ParentFlags.IgnoreResult | ParentFlags.InstanceAccess))
+                        if (!TryEmit(opExpr, paramExprs, il, ref closure,
+                            parent & ~ParentFlags.IgnoreResult | ParentFlags.InstanceAccess))
                         {
                             return false;
                         }
@@ -2061,10 +2035,10 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                         return EmitMethodCall(il, sourceType.FindValueGetterMethod(), parent);
                     }
                 }
-                else
-                {
-                    underlyingNullableSourceType = null;
-                }
+                    else
+                    {
+                        underlyingNullableSourceType = null;
+                    }
 
                 if (!TryEmit(opExpr, paramExprs, il, ref closure, parent & ~ParentFlags.IgnoreResult & ~ParentFlags.InstanceAccess))
                 {
@@ -3537,7 +3511,8 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
 
                     // todo: for now handling only parameters of the same type
                     var method = leftOpType
-                        .GetPublicStaticMethods(methodName)
+                        .GetPublicStaticMembers(methodName)
+                        .Cast<MethodInfo>()
                         .FirstOrDefault(m => m.GetParameters().All(p => p.ParameterType == leftOpType));
 
                     if (method != null)
