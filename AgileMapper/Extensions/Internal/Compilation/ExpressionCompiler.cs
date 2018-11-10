@@ -1568,7 +1568,7 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
 
                     il.Emit(OpCodes.Brfalse, labelFalse);
                     il.Emit(OpCodes.Ldloca_S, loc);
-                    if (!EmitMethodCall(il, leftType.FindNullableValueOrDefaultMethod()))
+                    if (!EmitMethodCall(il, leftType.FindNullableGetValueOrDefaultMethod()))
                     {
                         return false;
                     }
@@ -2004,7 +2004,6 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
             private static bool TryEmitConvert(UnaryExpression expr,
                 IList<ParameterExpression> paramExprs, ILGenerator il, ref ClosureInfo closure, ParentFlags parent)
             {
-                var targetType = expr.Type;
                 var opExpr = expr.Operand;
                 var method = expr.Method;
                 if (method != null && method.Name != "op_Implicit" && method.Name != "op_Explicit")
@@ -2013,6 +2012,7 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                         && EmitMethodCall(il, method, parent);
                 }
 
+                var targetType = expr.Type;
                 var sourceType = opExpr.Type;
                 var underlyingNullableSourceType = sourceType.GetNonNullableType();
                 var sourceTypeIsNullable = underlyingNullableSourceType != sourceType;
@@ -2035,10 +2035,10 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                         return EmitMethodCall(il, sourceType.FindValueGetterMethod(), parent);
                     }
                 }
-                    else
-                    {
-                        underlyingNullableSourceType = null;
-                    }
+                else
+                {
+                    underlyingNullableSourceType = null;
+                }
 
                 if (!TryEmit(opExpr, paramExprs, il, ref closure, parent & ~ParentFlags.IgnoreResult & ~ParentFlags.InstanceAccess))
                 {
@@ -2135,11 +2135,17 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                 // Conversion to Nullable: new Nullable<T>(T val);
                 else if (targetTypeIsNullable)
                 {
-                    if (sourceTypeIsNullable)
+                    if (!sourceTypeIsNullable)
                     {
-                        var labelFalse = il.DefineLabel();
-                        var labelDone = il.DefineLabel();
-                        var targetVar = il.DeclareLocal(targetType);
+                        if (!TryEmitValueConvert(underlyingNullableTargetType, il, isChecked: false))
+                        {
+                            return false;
+                        }
+
+                        il.Emit(OpCodes.Newobj, targetType.GetPublicInstanceConstructors().First());
+                    }
+                    else
+                    {
                         var sourceVar = DeclareAndLoadLocalVariable(il, sourceType);
 
                         if (!EmitMethodCall(il, sourceType.FindNullableHasValueGetterMethod()))
@@ -2147,34 +2153,33 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                             return false;
                         }
 
-                        il.Emit(OpCodes.Brfalse, labelFalse);
+                        var labelSourceHasValue = il.DefineLabel();
+                        il.Emit(OpCodes.Brtrue_S, labelSourceHasValue); // jump where source has a value
+
+                        // otherwise, emit and load a `new Nullable<TTarget>()` struct (that's why a Init instead of New)
+                        il.Emit(OpCodes.Ldloc, InitValueTypeVariable(il, targetType));
+
+                        // jump to completion
+                        var labelDone = il.DefineLabel();
+                        il.Emit(OpCodes.Br_S, labelDone);
+
+                        // if source nullable has a value:
+                        il.MarkLabel(labelSourceHasValue);
                         il.Emit(OpCodes.Ldloca_S, sourceVar);
-                        if (!EmitMethodCall(il, sourceType.FindNullableValueOrDefaultMethod()))
+                        if (!EmitMethodCall(il, sourceType.FindNullableGetValueOrDefaultMethod()))
                         {
                             return false;
                         }
 
-                        TryEmitValueConvert(underlyingNullableTargetType, il, expr.NodeType == ExpressionType.ConvertChecked);
-
-                        il.Emit(OpCodes.Newobj, targetType.GetPublicInstanceConstructor(underlyingNullableTargetType));
-                        il.Emit(OpCodes.Stloc_S, targetVar);
-                        il.Emit(OpCodes.Br_S, labelDone);
-                        il.MarkLabel(labelFalse);
-                        il.Emit(OpCodes.Ldloca_S, targetVar);
-                        il.Emit(OpCodes.Initobj, targetType);
-                        il.MarkLabel(labelDone);
-                        il.Emit(OpCodes.Ldloc_S, targetVar);
-                        if ((parent & ParentFlags.IgnoreResult) > 0)
+                        if (!TryEmitValueConvert(underlyingNullableTargetType, il,
+                            expr.NodeType == ExpressionType.ConvertChecked))
                         {
-                            il.Emit(OpCodes.Pop);
+                            return false;
                         }
 
-                        return true;
+                        il.Emit(OpCodes.Newobj, targetType.GetPublicInstanceConstructors().First());
+                        il.MarkLabel(labelDone);
                     }
-
-                    TryEmitValueConvert(underlyingNullableTargetType, il, isChecked: false);
-
-                    il.Emit(OpCodes.Newobj, targetType.GetPublicInstanceConstructor(underlyingNullableTargetType));
                 }
                 else
                 {
@@ -2364,36 +2369,7 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                     }
                     else if (constantType == typeof(decimal))
                     {
-                        //check if decimal has decimal places, if not use shorter IL code (constructor from int or long)
-                        var value = (decimal)constantValue;
-                        if (value % 1 == 0)
-                        {
-                            if (value <= int.MaxValue && value >= int.MinValue)
-                            {
-                                EmitLoadConstantInt(il, decimal.ToInt32(value));
-                                il.Emit(OpCodes.Newobj, typeof(decimal).GetPublicInstanceConstructor(typeof(int)));
-                            }
-                            else if (value <= long.MaxValue && value >= long.MinValue)
-                            {
-                                il.Emit(OpCodes.Ldc_I8, decimal.ToInt64(value));
-                                il.Emit(OpCodes.Newobj, typeof(decimal).GetPublicInstanceConstructor(typeof(int)));
-                            }
-                        }
-                        else
-                        {
-                            int[] parts = Decimal.GetBits(value);
-                            bool sign = (parts[3] & 0x80000000) != 0;
-                            byte scale = (byte)((parts[3] >> 16) & 0x7F);
-                            EmitLoadConstantInt(il, parts[0]);
-                            EmitLoadConstantInt(il, parts[1]);
-                            EmitLoadConstantInt(il, parts[2]);
-                            il.Emit(sign ? OpCodes.Ldc_I4_1 : OpCodes.Ldc_I4_0);
-                            EmitLoadConstantInt(il, scale);
-                            il.Emit(OpCodes.Conv_U1);
-                            il.Emit(OpCodes.Newobj,
-                                typeof(decimal).GetPublicInstanceConstructors().First(x =>
-                                    x.GetParameters().Length == 5));
-                        }
+                        EmitDecimalConstant((decimal)constantValue, il);
                     }
                     else
                     {
@@ -2415,6 +2391,55 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                 }
 
                 return true;
+            }
+
+            private static void EmitDecimalConstant(decimal value, ILGenerator il)
+            {
+                //check if decimal has decimal places, if not use shorter IL code (constructor from int or long)
+                if (value % 1 == 0)
+                {
+                    if (value >= int.MinValue && value <= int.MaxValue)
+                    {
+                        EmitLoadConstantInt(il, decimal.ToInt32(value));
+                        il.Emit(OpCodes.Newobj, typeof(decimal).GetPublicInstanceConstructor(typeof(int)));
+                        return;
+                    }
+
+                    if (value >= long.MinValue && value <= long.MaxValue)
+                    {
+                        il.Emit(OpCodes.Ldc_I8, decimal.ToInt64(value));
+                        il.Emit(OpCodes.Newobj, typeof(decimal).GetPublicInstanceConstructor(typeof(long)));
+                        return;
+                    }
+                }
+
+                if (value == decimal.MinValue)
+                {
+                    il.Emit(OpCodes.Ldsfld, typeof(decimal).GetTypeInfo().GetDeclaredField(nameof(decimal.MinValue)));
+                    return;
+                }
+
+                if (value == decimal.MaxValue)
+                {
+                    il.Emit(OpCodes.Ldsfld, typeof(decimal).GetTypeInfo().GetDeclaredField(nameof(decimal.MaxValue)));
+                    return;
+                }
+
+                var parts = decimal.GetBits(value);
+                var sign = (parts[3] & 0x80000000) != 0;
+                var scale = (byte)((parts[3] >> 16) & 0x7F);
+
+                EmitLoadConstantInt(il, parts[0]);
+                EmitLoadConstantInt(il, parts[1]);
+                EmitLoadConstantInt(il, parts[2]);
+
+                il.Emit(sign ? OpCodes.Ldc_I4_1 : OpCodes.Ldc_I4_0);
+                EmitLoadConstantInt(il, scale);
+
+                il.Emit(OpCodes.Conv_U1);
+                il.Emit(OpCodes.Newobj,
+                    typeof(decimal).GetPublicInstanceConstructors().First(
+                        x => x.GetParameters().Length == 5));
             }
 
             private static LocalBuilder DeclareAndLoadLocalVariable(ILGenerator il, Type type)
@@ -3313,9 +3338,7 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                 }
 
                 // Create nested closure object composed of all constants, params, lambdas loaded on stack
-                il.Emit(
-                    OpCodes.Newobj,
-                    isNestedArrayClosure
+                il.Emit(OpCodes.Newobj, isNestedArrayClosure
                     ? ArrayClosure.Constructor
                     : nestedClosureInfo.ClosureType.GetPublicInstanceConstructors().First());
 
@@ -3433,12 +3456,12 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                 }
 
                 var leftUnderlyingNullableType = leftOpType.GetNonNullableType();
-                var leftIsNull = leftUnderlyingNullableType != leftOpType;
+                var leftIsNullable = leftUnderlyingNullableType != leftOpType;
 
-                if (leftIsNull)
+                if (leftIsNullable)
                 {
                     lVar = DeclareAndLoadLocalVariable(il, leftOpType);
-                    if (!EmitMethodCall(il, leftOpType.FindNullableValueOrDefaultMethod()))
+                    if (!EmitMethodCall(il, leftOpType.FindNullableGetValueOrDefaultMethod()))
                     {
                         return false;
                     }
@@ -3484,13 +3507,17 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                     }
                 }
 
-                if (rightOpType.IsNullable())
+                var rightUnderlyingNullableType = rightOpType.GetNonNullableType();
+
+                if (rightUnderlyingNullableType != rightOpType)
                 {
                     rVar = DeclareAndLoadLocalVariable(il, rightOpType);
-                    if (!EmitMethodCall(il, rightOpType.FindNullableValueOrDefaultMethod()))
+                    if (!EmitMethodCall(il, rightOpType.FindNullableGetValueOrDefaultMethod()))
                     {
                         return false;
                     }
+
+                    rightOpType = rightUnderlyingNullableType;
                 }
 
                 if (!leftOpType.IsPrimitive() && !leftOpType.IsEnum())
@@ -3532,7 +3559,7 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                         il.Emit(OpCodes.Ceq);
                     }
 
-                    if (leftIsNull)
+                    if (leftIsNullable)
                     {
                         goto nullCheck;
                     }
@@ -3568,22 +3595,25 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
 
                     case ExpressionType.GreaterThanOrEqual:
                     case ExpressionType.LessThanOrEqual:
-                        var l1 = il.DefineLabel();
-                        var l2 = il.DefineLabel();
-                        if (rightOpType == typeof(uint) || rightOpType == typeof(ulong) || rightOpType == typeof(ushort) || rightOpType == typeof(byte))
+                        var ifTrueLabel = il.DefineLabel();
+                        if (rightOpType == typeof(uint) || rightOpType == typeof(ulong) ||
+                            rightOpType == typeof(ushort) || rightOpType == typeof(byte))
                         {
-                            il.Emit(expressionType == ExpressionType.GreaterThanOrEqual ? OpCodes.Bge_Un_S : OpCodes.Ble_Un_S, l1);
+                            il.Emit(expressionType == ExpressionType.GreaterThanOrEqual ? OpCodes.Bge_Un_S : OpCodes.Ble_Un_S, ifTrueLabel);
                         }
                         else
                         {
-                            il.Emit(expressionType == ExpressionType.GreaterThanOrEqual ? OpCodes.Bge_S : OpCodes.Ble_S, l1);
+                            il.Emit(expressionType == ExpressionType.GreaterThanOrEqual ? OpCodes.Bge_S : OpCodes.Ble_S, ifTrueLabel);
                         }
 
                         il.Emit(OpCodes.Ldc_I4_0);
-                        il.Emit(OpCodes.Br_S, l2);
-                        il.MarkLabel(l1);
+                        var doneLabel = il.DefineLabel();
+                        il.Emit(OpCodes.Br_S, doneLabel);
+
+                        il.MarkLabel(ifTrueLabel);
                         il.Emit(OpCodes.Ldc_I4_1);
-                        il.MarkLabel(l2);
+
+                        il.MarkLabel(doneLabel);
                         break;
 
                     default:
@@ -3591,17 +3621,16 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                 }
 
                 nullCheck:
-                if (leftIsNull)
+                if (leftIsNullable)
                 {
                     il.Emit(OpCodes.Ldloca_S, lVar);
-                    var hasValueMethod = exprLeft.Type.FindNullableHasValueGetterMethod();
-                    if (!EmitMethodCall(il, hasValueMethod))
+                    if (!EmitMethodCall(il, exprLeft.Type.FindNullableHasValueGetterMethod()))
                     {
                         return false;
                     }
                     // ReSharper disable once AssignNullToNotNullAttribute
                     il.Emit(OpCodes.Ldloca_S, rVar);
-                    if (!EmitMethodCall(il, hasValueMethod))
+                    if (!EmitMethodCall(il, exprLeft.Type.FindNullableHasValueGetterMethod()))
                     {
                         return false;
                     }
@@ -3643,8 +3672,6 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                 return true;
             }
 
-
-
             private static bool TryEmitArithmetic(BinaryExpression expr, ExpressionType exprNodeType,
                 IList<ParameterExpression> paramExprs, ILGenerator il, ref ClosureInfo closure,
                 ParentFlags parent)
@@ -3672,7 +3699,7 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                     EmitMethodCall(il, lefType.FindNullableHasValueGetterMethod());
 
                     il.Emit(OpCodes.Brfalse, leftNoValueLabel);
-                    EmitMethodCall(il, lefType.FindNullableValueOrDefaultMethod());
+                    EmitMethodCall(il, lefType.FindNullableGetValueOrDefaultMethod());
                 }
                 else if (!TryEmit(leftExpr, paramExprs, il, ref closure, flags))
                 {
@@ -3700,7 +3727,7 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                     EmitMethodCall(il, rightType.FindNullableHasValueGetterMethod());
 
                     il.Emit(OpCodes.Brfalse, rightNoValueLabel);
-                    EmitMethodCall(il, rightType.FindNullableValueOrDefaultMethod());
+                    EmitMethodCall(il, rightType.FindNullableGetValueOrDefaultMethod());
                 }
                 else if (!TryEmit(rightExpr, paramExprs, il, ref closure, flags))
                 {
@@ -4018,12 +4045,13 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
         internal static bool IsUnsigned(this Type type) =>
             type == typeof(byte) || type == typeof(ushort) || type == typeof(uint) || type == typeof(ulong);
 
-        internal static bool IsNullable(this Type type) => Nullable.GetUnderlyingType(type) != null;
+        internal static bool IsNullable(this Type type) =>
+            type.IsClosedTypeOf(typeof(Nullable<>));
 
         internal static MethodInfo FindDelegateInvokeMethod(this Type type) =>
             type.GetPublicInstanceMethod("Invoke");
 
-        internal static MethodInfo FindNullableValueOrDefaultMethod(this Type type) =>
+        internal static MethodInfo FindNullableGetValueOrDefaultMethod(this Type type) =>
             type.GetPublicInstanceMethod("GetValueOrDefault", parameterCount: 0);
 
         internal static MethodInfo FindValueGetterMethod(this Type type) =>
