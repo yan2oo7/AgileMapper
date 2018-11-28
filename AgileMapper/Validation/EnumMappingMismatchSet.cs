@@ -8,6 +8,7 @@
     using Extensions.Internal;
     using Members;
     using ReadableExpressions;
+    using ReadableExpressions.Extensions;
 #if NET35
     using Microsoft.Scripting.Ast;
 #else
@@ -186,8 +187,7 @@
                 }
 
                 var mismatches = unmatchedSourceValues
-                    .Project(value => $" - {sourceEnumType.Name}.{value} matches no {targetEnumType.Name}")
-                    .ToArray();
+                    .ProjectToArray(value => $" - {sourceEnumType.Name}.{value} matches no {targetEnumType.Name}");
 
                 return mismatches;
             }

@@ -21,9 +21,11 @@
     {
         private readonly MapperContext _mapperContext;
         private ICollection<Type> _appliedConfigurationTypes;
-        private List<MappedObjectCachingSettings> _mappedObjectCachingSettings;
+        private List<MappedObjectCachingSetting> _mappedObjectCachingSettings;
         private List<MapToNullCondition> _mapToNullConditions;
         private List<NullCollectionsSetting> _nullCollectionsSettings;
+        private List<EntityKeyMappingSetting> _entityKeyMappingSettings;
+        private List<DataSourceReversalSetting> _dataSourceReversalSettings;
         private ConfiguredServiceProvider _serviceProvider;
         private ConfiguredServiceProvider _namedServiceProvider;
         private List<ConfiguredObjectFactory> _objectFactories;
@@ -50,17 +52,17 @@
 
         #region MappedObjectCachingSettings
 
-        private List<MappedObjectCachingSettings> MappedObjectCachingSettings
-            => _mappedObjectCachingSettings ?? (_mappedObjectCachingSettings = new List<MappedObjectCachingSettings>());
+        private List<MappedObjectCachingSetting> MappedObjectCachingSettings
+            => _mappedObjectCachingSettings ?? (_mappedObjectCachingSettings = new List<MappedObjectCachingSetting>());
 
-        public void Add(MappedObjectCachingSettings settings)
+        public void Add(MappedObjectCachingSetting setting)
         {
             ThrowIfConflictingItemExists(
-                settings,
+                setting,
                 _mappedObjectCachingSettings,
                 (s, conflicting) => conflicting.GetConflictMessage(s));
 
-            MappedObjectCachingSettings.AddSorted(settings);
+            MappedObjectCachingSettings.AddSorted(setting);
         }
 
         public MappedObjectCachingMode CacheMappedObjects(IBasicMapperData basicData)
@@ -113,6 +115,83 @@
 
         public bool MapToNullCollections(IBasicMapperData basicData)
             => _nullCollectionsSettings?.Any(s => s.AppliesTo(basicData)) == true;
+
+        #endregion
+
+        #region EntityKeyMappingSettings
+
+        private List<EntityKeyMappingSetting> EntityKeyMappingSettings
+            => _entityKeyMappingSettings ?? (_entityKeyMappingSettings = new List<EntityKeyMappingSetting>());
+
+        public void Add(EntityKeyMappingSetting setting)
+        {
+            ThrowIfConflictingKeyMappingSettingExists(setting);
+
+            EntityKeyMappingSettings.AddSorted(setting);
+        }
+
+        public bool MapEntityKeys(IBasicMapperData basicData)
+            => _entityKeyMappingSettings?.FirstOrDefault(s => s.AppliesTo(basicData))?.MapKeys == true;
+
+        #endregion
+
+        #region ConfiguredDataSourceReversalSettings
+
+        private List<DataSourceReversalSetting> DataSourceReversalSettings
+            => _dataSourceReversalSettings ?? (_dataSourceReversalSettings = new List<DataSourceReversalSetting>());
+
+        public void Add(DataSourceReversalSetting setting)
+        {
+            ThrowIfConflictingDataSourceReversalSettingExists(setting);
+
+            DataSourceReversalSettings.AddSorted(setting);
+        }
+
+        public void AddReverseDataSourceFor(ConfiguredDataSourceFactory dataSourceFactory)
+            => AddReverse(dataSourceFactory, isAutoReversal: false);
+
+        private void AddReverse(ConfiguredDataSourceFactory dataSourceFactory, bool isAutoReversal)
+        {
+            var reverseDataSourceFactory = dataSourceFactory.CreateReverseIfAppropriate(isAutoReversal);
+
+            if (reverseDataSourceFactory != null)
+            {
+                DataSourceFactories.AddSortFilter(reverseDataSourceFactory);
+            }
+        }
+
+        public void RemoveReverseOf(MappingConfigInfo configInfo)
+        {
+            var dataSourceFactory = GetDataSourceFactoryFor(configInfo);
+            var reverseConfigInfo = dataSourceFactory.GetReverseConfigInfo();
+
+            for (var i = 0; i < _dataSourceFactories.Count; ++i)
+            {
+                if (_dataSourceFactories[i].ConfigInfo == reverseConfigInfo)
+                {
+                    _dataSourceFactories.RemoveAt(i);
+                    return;
+                }
+            }
+        }
+
+        public bool AutoDataSourceReversalEnabled(ConfiguredDataSourceFactory dataSourceFactory)
+            => AutoDataSourceReversalEnabled(dataSourceFactory, dsf => dsf.ConfigInfo.ToMapperData(dsf.TargetMember));
+
+        public bool AutoDataSourceReversalEnabled(MappingConfigInfo configInfo)
+            => AutoDataSourceReversalEnabled(configInfo, ci => ci.ToMapperData());
+
+        private bool AutoDataSourceReversalEnabled<T>(T dataItem, Func<T, IBasicMapperData> mapperDataFactory)
+        {
+            if (_dataSourceReversalSettings == null)
+            {
+                return false;
+            }
+
+            var basicData = mapperDataFactory.Invoke(dataItem);
+
+            return _dataSourceReversalSettings.FirstOrDefault(s => s.AppliesTo(basicData))?.Reverse == true;
+        }
 
         #endregion
 
@@ -261,11 +340,20 @@
 
             DataSourceFactories.AddSortFilter(dataSourceFactory);
 
-            if (!HasConfiguredRootDataSources && dataSourceFactory.TargetMember.IsRoot)
+            if (dataSourceFactory.TargetMember.IsRoot)
             {
                 HasConfiguredRootDataSources = true;
+                return;
+            }
+
+            if (AutoDataSourceReversalEnabled(dataSourceFactory))
+            {
+                AddReverse(dataSourceFactory, isAutoReversal: true);
             }
         }
+
+        public ConfiguredDataSourceFactory GetDataSourceFactoryFor(MappingConfigInfo configInfo)
+            => _dataSourceFactories.First(dsf => dsf.ConfigInfo == configInfo);
 
         public bool HasConfiguredRootDataSources { get; private set; }
 
@@ -342,14 +430,41 @@
 
         private void ThrowIfMemberIsUnmappable(ConfiguredIgnoredMember ignoredMember)
         {
-            if (ignoredMember.ConfigInfo.TargetMemberIsUnmappable(
+            if (ignoredMember.ConfigInfo.ToMapperData().TargetMemberIsUnmappable(
                 ignoredMember.TargetMember,
-                ci => QueryDataSourceFactories(ci.ToMapperData()),
+                QueryDataSourceFactories,
+                this,
                 out var reason))
             {
                 throw new MappingConfigurationException(
                     $"{ignoredMember.TargetMember.GetPath()} will not be mapped and does not need to be ignored ({reason})");
             }
+        }
+
+        private void ThrowIfConflictingKeyMappingSettingExists(EntityKeyMappingSetting setting)
+        {
+            if ((_entityKeyMappingSettings == null) && !setting.MapKeys)
+            {
+                throw new MappingConfigurationException("Entity key mapping is disabled by default");
+            }
+
+            ThrowIfConflictingItemExists(
+                setting,
+                _entityKeyMappingSettings,
+                (s, conflicting) => conflicting.GetConflictMessage(s));
+        }
+
+        private void ThrowIfConflictingDataSourceReversalSettingExists(DataSourceReversalSetting setting)
+        {
+            if ((_dataSourceReversalSettings == null) && !setting.Reverse)
+            {
+                throw new MappingConfigurationException("Configured data source reversal is disabled by default");
+            }
+
+            ThrowIfConflictingItemExists(
+                setting,
+                _dataSourceReversalSettings,
+                (s, conflicting) => conflicting.GetConflictMessage(s));
         }
 
         internal void ThrowIfConflictingIgnoredMemberExists<TConfiguredItem>(TConfiguredItem configuredItem)
@@ -402,10 +517,12 @@
             _mappedObjectCachingSettings?.CopyTo(configurations.MappedObjectCachingSettings);
             _mapToNullConditions?.CopyTo(configurations.MapToNullConditions);
             _nullCollectionsSettings?.CopyTo(configurations.NullCollectionsSettings);
+            _entityKeyMappingSettings?.CopyTo(configurations.EntityKeyMappingSettings);
+            _dataSourceReversalSettings?.CopyTo(configurations.DataSourceReversalSettings);
             _objectFactories?.CloneItems().CopyTo(configurations.ObjectFactories);
             _identifiers?.CloneTo(configurations.Identifiers);
             _ignoredMembers?.CloneItems().CopyTo(configurations.IgnoredMembers);
-            _enumPairings?.CopyTo(configurations._enumPairings);
+            _enumPairings?.CopyTo(configurations.EnumPairings);
             _dictionaries?.CloneTo(configurations.Dictionaries);
             _dataSourceFactories?.CloneItems().CopyTo(configurations.DataSourceFactories);
             _mappingCallbackFactories?.CopyTo(configurations.MappingCallbackFactories);
@@ -421,6 +538,8 @@
             _mappedObjectCachingSettings?.Clear();
             _mapToNullConditions?.Clear();
             _nullCollectionsSettings?.Clear();
+            _entityKeyMappingSettings?.Clear();
+            _dataSourceReversalSettings?.Clear();
             _serviceProvider = _namedServiceProvider = null;
             _objectFactories?.Clear();
             _identifiers?.Reset();

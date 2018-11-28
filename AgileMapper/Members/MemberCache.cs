@@ -8,6 +8,7 @@
     using Extensions;
     using Extensions.Internal;
     using NetStandardPolyfills;
+    using ReadableExpressions.Extensions;
     using static System.StringComparer;
 
     internal class MemberCache
@@ -51,7 +52,7 @@
 
                 var constructorParameterNames = key.Type
                     .GetPublicInstanceConstructors()
-                    .SelectMany(ctor => ctor.GetParameters().Project(p => p.Name))
+                    .SelectMany(ctor => ctor.GetParameters().ProjectToArray(p => p.Name))
                     .Distinct()
                     .ToArray();
 

@@ -3,7 +3,6 @@ namespace AgileObjects.AgileMapper.Configuration
     using System;
     using System.Collections.Generic;
     using System.Linq;
-    using Extensions;
     using Extensions.Internal;
     using Members;
     using NetStandardPolyfills;
@@ -165,7 +164,7 @@ namespace AgileObjects.AgileMapper.Configuration
         {
             var contextInfo = GetAppropriateMappingContext(swapArgs);
 
-            return swapArgs.Lambda.ReplaceParametersWith(parameterFactories.Project(f => f.Invoke(contextInfo)).ToArray());
+            return swapArgs.Lambda.ReplaceParametersWith(parameterFactories.ProjectToArray(f => f.Invoke(contextInfo)));
         }
 
         private static MappingContextInfo GetAppropriateMappingContext(SwapArgs swapArgs)

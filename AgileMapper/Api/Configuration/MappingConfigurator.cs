@@ -203,9 +203,7 @@
 
         public IFullMappingSettings<TSource, TTarget> PassExceptionsTo(Action<IMappingExceptionData<TSource, TTarget>> callback)
         {
-            var exceptionCallback = new ExceptionCallback(ConfigInfo, callback.ToConstantExpression());
-
-            MapperContext.UserConfigurations.Add(exceptionCallback);
+            MapperContext.UserConfigurations.Add(new ExceptionCallback(ConfigInfo, callback.ToConstantExpression()));
             return this;
         }
 
@@ -215,17 +213,35 @@
 
         private IFullMappingSettings<TSource, TTarget> SetMappedObjectCaching(bool cache)
         {
-            var settings = new MappedObjectCachingSettings(ConfigInfo, cache);
-
-            MapperContext.UserConfigurations.Add(settings);
+            MapperContext.UserConfigurations.Add(new MappedObjectCachingSetting(ConfigInfo, cache));
             return this;
         }
 
         public IFullMappingSettings<TSource, TTarget> MapNullCollectionsToNull()
         {
-            var nullSetting = new NullCollectionsSetting(ConfigInfo);
+            MapperContext.UserConfigurations.Add(new NullCollectionsSetting(ConfigInfo));
+            return this;
+        }
 
-            MapperContext.UserConfigurations.Add(nullSetting);
+        public IFullMappingSettings<TSource, TTarget> MapEntityKeys() => SetEntityKeyMapping(mapKeys: true);
+
+        public IFullMappingSettings<TSource, TTarget> IgnoreEntityKeys() => SetEntityKeyMapping(mapKeys: false);
+
+        private IFullMappingSettings<TSource, TTarget> SetEntityKeyMapping(bool mapKeys)
+        {
+            MapperContext.UserConfigurations.Add(new EntityKeyMappingSetting(ConfigInfo, mapKeys));
+            return this;
+        }
+
+        public IFullMappingSettings<TSource, TTarget> AutoReverseConfiguredDataSources() 
+            => SetDataSourceReversal(reverse: true);
+
+        public IFullMappingSettings<TSource, TTarget> DoNotAutoReverseConfiguredDataSources()
+            => SetDataSourceReversal(reverse: false);
+
+        private IFullMappingSettings<TSource, TTarget> SetDataSourceReversal(bool reverse)
+        {
+            MapperContext.UserConfigurations.Add(new DataSourceReversalSetting(ConfigInfo, reverse));
             return this;
         }
 
@@ -314,6 +330,13 @@
 
         #region Map Overloads
 
+        public ICustomDataSourceMappingConfigContinuation<TSource, TTarget> Map<TSourceValue, TTargetValue>(
+            Expression<Func<TSource, TSourceValue>> valueFactoryExpression,
+            Expression<Func<TTarget, TTargetValue>> targetMember)
+        {
+            return GetValueFactoryTargetMemberSpecifier<TSourceValue>(valueFactoryExpression).To(targetMember);
+        }
+
         public ICustomMappingDataSourceTargetMemberSpecifier<TSource, TTarget> Map<TSourceValue>(
             Expression<Func<IMappingData<TSource, TTarget>, TSourceValue>> valueFactoryExpression)
         {
@@ -345,6 +368,13 @@
         public ICustomMappingDataSourceTargetMemberSpecifier<TSource, TTarget> Map<TSourceValue>(TSourceValue value)
             => GetConstantValueTargetMemberSpecifier(value);
 
+        public IMappingConfigContinuation<TSource, TTarget> Map<TSourceValue, TTargetValue>(
+            TSourceValue value,
+            Expression<Func<TTarget, TTargetValue>> targetMember)
+        {
+            return GetConstantValueTargetMemberSpecifier(value).To(targetMember);
+        }
+
         ICustomProjectionDataSourceTargetMemberSpecifier<TSource, TTarget> IRootProjectionConfigurator<TSource, TTarget>.Map<TSourceValue>(
             TSourceValue value)
         {
@@ -358,7 +388,8 @@
         {
             return new CustomDataSourceTargetMemberSpecifier<TSource, TTarget>(
                 ConfigInfo.ForSourceValueType<TSourceValue>(),
-                valueFactoryExpression);
+                valueFactoryExpression,
+                valueCouldBeSourceMember: true);
         }
 
         private CustomDataSourceTargetMemberSpecifier<TSource, TTarget> GetConstantValueTargetMemberSpecifier<TSourceValue>(
@@ -381,7 +412,8 @@
 
             return new CustomDataSourceTargetMemberSpecifier<TSource, TTarget>(
                 ConfigInfo.ForSourceValueType(valueConstant.Type),
-                valueLambda);
+                valueLambda,
+                valueCouldBeSourceMember: false);
         }
 
         #endregion
