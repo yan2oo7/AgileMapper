@@ -8,7 +8,10 @@ site_dir: 'docs/site'
 
 extra_css:
     - https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.13.1/styles/vs2015.min.css
-    - css/styles.css
+    - css/styles.min.css
+
+extra_javascript:
+    - scripts/docs.min.js
 
 nav:
     - General Use:
@@ -45,6 +48,7 @@ nav:
         - Dependency injection: configuration/Dependency-Injection.md
         - Member values: configuration/Member-Values.md
         - Constructor arguments: configuration/Constructor-Arguments.md
+        - Entity mapping: configuration/Entity-Mapping.md
         - Member name patterns: configuration/Member-Name-Patterns.md
         - To-string formatting: configuration/To-String-Formatting.md
         - Enum pairing: Enum-Mapping/#configuring-enum-pairs
