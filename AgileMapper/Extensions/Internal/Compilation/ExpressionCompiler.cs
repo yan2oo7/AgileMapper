@@ -33,6 +33,7 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
     using System.Reflection.Emit;
     using Internal;
     using NetStandardPolyfills;
+    using ReadableExpressions.Extensions;
 #if NET35
     using Microsoft.Scripting.Ast;
 #else
@@ -2415,13 +2416,13 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
 
                 if (value == decimal.MinValue)
                 {
-                    il.Emit(OpCodes.Ldsfld, typeof(decimal).GetTypeInfo().GetDeclaredField(nameof(decimal.MinValue)));
+                    il.Emit(OpCodes.Ldsfld, typeof(decimal).GetPublicStaticField(nameof(decimal.MinValue)));
                     return;
                 }
 
                 if (value == decimal.MaxValue)
                 {
-                    il.Emit(OpCodes.Ldsfld, typeof(decimal).GetTypeInfo().GetDeclaredField(nameof(decimal.MaxValue)));
+                    il.Emit(OpCodes.Ldsfld, typeof(decimal).GetPublicStaticField(nameof(decimal.MaxValue)));
                     return;
                 }
 
@@ -3620,7 +3621,7 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                         return false;
                 }
 
-                nullCheck:
+            nullCheck:
                 if (leftIsNullable)
                 {
                     il.Emit(OpCodes.Ldloca_S, lVar);
