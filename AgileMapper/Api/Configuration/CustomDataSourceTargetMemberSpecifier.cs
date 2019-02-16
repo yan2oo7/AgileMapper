@@ -134,7 +134,7 @@
                 .GetConversion(customValueLambda.Body, typeof(TTargetValue));
 
             var valueLambda = Lambda<Func<TTargetValue>>(convertedConstantValue);
-            var valueFunc = valueLambda.Compile();
+            var valueFunc = valueLambda.CompileFast();
             var value = valueFunc.Invoke().ToConstantExpression(typeof(TTargetValue));
             var constantValueLambda = Lambda<Func<TTargetValue>>(value);
             var valueLambdaInfo = ConfiguredLambdaInfo.For(constantValueLambda);
