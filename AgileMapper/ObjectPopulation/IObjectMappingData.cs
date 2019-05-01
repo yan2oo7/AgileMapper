@@ -12,6 +12,8 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
 
         new IObjectMappingData Parent { get; }
 
+        bool IsPartOfRepeatedMapping { get; set; }
+
         bool IsPartOfDerivedTypeMapping { get; }
 
         IObjectMappingData DeclaredTypeMappingData { get; }
@@ -100,6 +102,19 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
             TSourceElement sourceElement,
             TTargetElement targetElement,
             int enumerableIndex);
+
+        /// <summary>
+        /// Gets the <see cref="IObjectMappingData{TSource, TTarget}"/> as an 
+        /// <see cref="IObjectMappingData{TNewSource, TTarget}"/> using the given
+        /// <paramref name="newSource"/>.
+        /// </summary>
+        /// <typeparam name="TNewSource">The type of the new source object to use.</typeparam>
+        /// <param name="newSource">The new source object to use.</param>
+        /// <returns>
+        /// The <see cref="IObjectMappingData{TSource, TTarget}"/> as a 
+        /// <see cref="IObjectMappingData{TNewSource, TTarget}"/>.
+        /// </returns>
+        IObjectMappingData<TNewSource, TTarget> WithSource<TNewSource>(TNewSource newSource);
 
         /// <summary>
         /// Gets the <see cref="IObjectMappingData{TSource, TTarget}"/> typed as a 

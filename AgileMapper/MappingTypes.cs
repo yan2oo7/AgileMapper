@@ -99,20 +99,15 @@ namespace AgileObjects.AgileMapper
 
         public bool Equals(MappingTypes otherTypes) => otherTypes._hashCode == _hashCode;
 
+        #region ExcludeFromCodeCoverage
+#if DEBUG
+        [ExcludeFromCodeCoverage]
+#endif
+        #endregion
         public override int GetHashCode() => _hashCode;
 
-        public MappingTypes WithTypes<TNewSource, TNewTarget>()
-        {
-            if (RuntimeTypesAreTheSame)
-            {
-                return this;
-            }
-
-            return new MappingTypes(
-                typeof(TNewSource),
-                typeof(TNewTarget),
-                RuntimeTypesAreTheSame);
-        }
+        public MappingTypes WithTypes(Type newSourceType, Type newTargetType)
+            => new MappingTypes(newSourceType, newTargetType, RuntimeTypesAreTheSame);
     }
 
     internal static class MappingTypes<TSource, TTarget>

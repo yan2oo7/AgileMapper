@@ -1,40 +1,46 @@
 namespace AgileObjects.AgileMapper.ObjectPopulation
 {
     using System.Collections.Generic;
+    using System.Linq;
 #if NET35
     using Microsoft.Scripting.Ast;
+    using static Microsoft.Scripting.Ast.ExpressionType;
 #else
     using System.Linq.Expressions;
+    using static System.Linq.Expressions.ExpressionType;
 #endif
     using DataSources;
+    using Extensions;
     using Members;
+    using static CallbackPosition;
 
     internal class MappingCreationContext
     {
         private bool _mapperDataHasRootEnumerableVariables;
+        private List<Expression> _memberMappingExpressions;
 
-        public MappingCreationContext(
-            IObjectMappingData mappingData,
-            Expression mapToNullCondition = null,
-            List<Expression> mappingExpressions = null)
-            : this(mappingData, null, null, mapToNullCondition, mappingExpressions)
+        public MappingCreationContext(IObjectMappingData mappingData)
         {
-        }
+            var mapperData = mappingData.MapperData;
 
-        public MappingCreationContext(
-            IObjectMappingData mappingData,
-            Expression preMappingCallback,
-            Expression postMappingCallback,
-            Expression mapToNullCondition,
-            List<Expression> mappingExpressions = null)
-        {
             MappingData = mappingData;
-            PreMappingCallback = preMappingCallback;
-            PostMappingCallback = postMappingCallback;
-            MapToNullCondition = mapToNullCondition;
+            MapToNullCondition = GetMapToNullConditionOrNull(mapperData);
             InstantiateLocalVariable = true;
-            MappingExpressions = mappingExpressions ?? new List<Expression>();
+            MappingExpressions = new List<Expression>();
+
+            if (mapperData.RuleSet.Settings.UseSingleRootMappingExpression)
+            {
+                return;
+            }
+
+            var basicMapperData = mapperData.WithNoTargetMember();
+
+            PreMappingCallback = basicMapperData.GetMappingCallbackOrNull(Before, mapperData);
+            PostMappingCallback = basicMapperData.GetMappingCallbackOrNull(After, mapperData);
         }
+
+        private static Expression GetMapToNullConditionOrNull(IMemberMapperData mapperData)
+            => mapperData.MapperContext.UserConfigurations.GetMapToNullConditionOrNull(mapperData);
 
         public MapperContext MapperContext => MapperData.MapperContext;
 
@@ -43,8 +49,6 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
         public ObjectMapperData MapperData => MappingData.MapperData;
 
         public QualifiedMember TargetMember => MapperData.TargetMember;
-
-        public bool IsRoot => MappingData.IsRoot;
 
         public IObjectMappingData MappingData { get; }
 
@@ -58,11 +62,50 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
 
         public bool InstantiateLocalVariable { get; set; }
 
+        public List<Expression> GetMemberMappingExpressions()
+        {
+            if (_memberMappingExpressions?.Count == MappingExpressions.Count)
+            {
+                return _memberMappingExpressions ?? new List<Expression>(0);
+            }
+
+            return _memberMappingExpressions = MappingExpressions.Filter(IsMemberMapping).ToList();
+        }
+
+        private static bool IsMemberMapping(Expression expression)
+        {
+            switch (expression.NodeType)
+            {
+                case Constant:
+                    return false;
+
+                case Call when (
+                    IsCallTo(nameof(IObjectMappingDataUntyped.Register), expression) ||
+                    IsCallTo(nameof(IObjectMappingDataUntyped.TryGet), expression)):
+
+                    return false;
+
+                case Assign when IsMapRepeatedCall(((BinaryExpression)expression).Right):
+                    return false;
+            }
+
+            return true;
+        }
+
+        private static bool IsCallTo(string methodName, Expression call)
+            => ((MethodCallExpression)call).Method.Name == methodName;
+
+        private static bool IsMapRepeatedCall(Expression expression)
+        {
+            return (expression.NodeType == Call) &&
+                    IsCallTo(nameof(IObjectMappingDataUntyped.MapRepeated), expression);
+        }
+
         public MappingCreationContext WithDataSource(IDataSource newDataSource)
         {
             var newSourceMappingData = MappingData.WithSource(newDataSource.SourceMember);
 
-            var newContext = new MappingCreationContext(newSourceMappingData, mappingExpressions: MappingExpressions)
+            var newContext = new MappingCreationContext(newSourceMappingData)
             {
                 InstantiateLocalVariable = false
             };

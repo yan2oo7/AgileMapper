@@ -21,9 +21,6 @@ namespace AgileObjects.AgileMapper.Members
 
     internal static class MemberMapperDataExtensions
     {
-        public static bool IsStandalone(this IObjectMappingData mappingData)
-            => mappingData.IsRoot || mappingData.MappingTypes.RuntimeTypesNeeded;
-
         public static bool TargetTypeIsEntity(this IMemberMapperData mapperData)
             => IsEntity(mapperData, mapperData.TargetType, out _);
 
@@ -35,10 +32,7 @@ namespace AgileObjects.AgileMapper.Members
                 return false;
             }
 
-            idMember = mapperData
-                .MapperContext
-                .Naming
-                .GetIdentifierOrNull(type);
+            idMember = mapperData.GetIdentifierOrNull(type);
 
             return idMember?.IsEntityId() == true;
         }
@@ -110,6 +104,16 @@ namespace AgileObjects.AgileMapper.Members
 
             return mapperData.SourceMember.Matches(mapperData.Parent.SourceMember);
         }
+
+        public static MemberInfo GetOrderMember(this IMemberMapperData mapperData, Type type)
+        {
+            return type.GetPublicInstanceMember("Order") ??
+                   type.GetPublicInstanceMember("DateCreated") ??
+                   mapperData.GetIdentifierOrNull(type)?.MemberInfo;
+        }
+
+        public static Member GetIdentifierOrNull(this IMemberMapperData mapperData, Type type)
+            => mapperData.MapperContext.GetIdentifierOrNull(type);
 
         public static Expression GetTargetMemberAccess(this IMemberMapperData mapperData)
         {
@@ -426,7 +430,6 @@ namespace AgileObjects.AgileMapper.Members
                 .GetCallbackOrNull(callbackPosition, basicData, mapperData);
         }
 
-
         public static ICollection<Type> GetDerivedSourceTypes(this IMemberMapperData mapperData)
             => GlobalContext.Instance.DerivedTypes.GetTypesDerivedFrom(mapperData.SourceType);
 
@@ -565,7 +568,7 @@ namespace AgileObjects.AgileMapper.Members
             => GetAsCall(mapperData.MappingDataObject, sourceType, targetType);
 
         public static Expression GetAsCall(this Expression subject, params Type[] contextTypes)
-            => GetAsCall(subject, null, contextTypes);
+            => GetAsCall(subject, true.ToConstantExpression(), contextTypes);
 
         public static Expression GetAsCall(this Expression subject, Expression isForDerivedTypeArgument, params Type[] contextTypes)
         {
@@ -577,12 +580,9 @@ namespace AgileObjects.AgileMapper.Members
 
             if (subject.Type == typeof(IMappingData))
             {
-                return GetAsCall(subject, typeof(IMappingData).GetPublicInstanceMethod("As"), contextTypes);
-            }
-
-            if (isForDerivedTypeArgument == null)
-            {
-                isForDerivedTypeArgument = true.ToConstantExpression();
+                return Expression.Call(
+                    subject,
+                    typeof(IMappingData).GetPublicInstanceMethod("As").MakeGenericMethod(contextTypes));
             }
 
             MethodInfo conversionMethod;
@@ -600,18 +600,10 @@ namespace AgileObjects.AgileMapper.Members
                 conversionMethod = typeof(IObjectMappingDataUntyped).GetPublicInstanceMethod("As");
             }
 
-            return GetAsCall(subject, conversionMethod, contextTypes, isForDerivedTypeArgument);
-        }
-
-        private static Expression GetAsCall(
-            Expression subject,
-            MethodInfo asMethod,
-            Type[] typeArguments,
-            Expression isForDerivedTypeArgument = null)
-        {
-            return (isForDerivedTypeArgument != null)
-                ? Expression.Call(subject, asMethod.MakeGenericMethod(typeArguments), isForDerivedTypeArgument)
-                : Expression.Call(subject, asMethod.MakeGenericMethod(typeArguments));
+            return Expression.Call(
+                subject,
+                conversionMethod.MakeGenericMethod(contextTypes),
+                isForDerivedTypeArgument);
         }
 
         public static Expression GetSourceAccess(

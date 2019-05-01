@@ -121,7 +121,7 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
 
         public ObjectMapperData MapperData
         {
-            get => _mapperData ?? (_mapperData = _mapper?.MapperData ?? ObjectMapperData.For<TSource, TTarget>(this));
+            get => _mapperData ?? (_mapperData = _mapper?.MapperData ?? ObjectMapperData.For(this));
             set => _mapperData = value;
         }
 
@@ -134,6 +134,8 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
         public IObjectMappingData Parent { get; }
 
         IObjectMappingDataUntyped IObjectMappingData<TSource, TTarget>.Parent => Parent;
+
+        public bool IsPartOfRepeatedMapping { get; set; }
 
         public bool IsPartOfDerivedTypeMapping => DeclaredTypeMappingData != null;
 
@@ -210,14 +212,14 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
         public TDeclaredTarget Map<TDeclaredSource, TDeclaredTarget>(
             TDeclaredSource sourceValue,
             TDeclaredTarget targetValue,
-            string targetMemberName,
+            string targetMemberRegistrationName,
             int dataSourceIndex)
         {
             var childMappingData = GetChildMappingData(
                 sourceValue,
                 targetValue,
                 GetEnumerableIndex(),
-                targetMemberName,
+                targetMemberRegistrationName,
                 dataSourceIndex);
 
             return (TDeclaredTarget)_mapper.MapSubObject(childMappingData);
@@ -227,14 +229,14 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
             TDeclaredSource sourceValue,
             TDeclaredTarget targetValue,
             int? enumerableIndex,
-            string targetMemberName,
+            string targetMemberRegistrationName,
             int dataSourceIndex)
         {
             return ObjectMappingDataFactory.ForChild(
                 sourceValue,
                 targetValue,
                 enumerableIndex,
-                targetMemberName,
+                targetMemberRegistrationName,
                 dataSourceIndex,
                 this);
         }
@@ -265,7 +267,7 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
             TDeclaredSource sourceValue,
             TDeclaredTarget targetValue,
             int? enumerableIndex,
-            string targetMemberName,
+            string targetMemberRegistrationName,
             int dataSourceIndex)
         {
             if (IsRoot || MapperKey.MappingTypes.RuntimeTypesNeeded)
@@ -274,8 +276,10 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
                     sourceValue,
                     targetValue,
                     enumerableIndex,
-                    targetMemberName,
+                    targetMemberRegistrationName,
                     dataSourceIndex);
+
+                childMappingData.IsPartOfRepeatedMapping = true;
 
                 return (TDeclaredTarget)_mapper.MapRepeated(childMappingData);
             }
@@ -284,7 +288,7 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
                 sourceValue,
                 targetValue,
                 enumerableIndex,
-                targetMemberName,
+                targetMemberRegistrationName,
                 dataSourceIndex);
         }
 
@@ -299,6 +303,8 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
                     sourceElement,
                     targetElement,
                     enumerableIndex);
+
+                childMappingData.IsPartOfRepeatedMapping = true;
 
                 return (TDeclaredTarget)_mapper.MapRepeated(childMappingData);
             }
@@ -343,25 +349,35 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
             _mappedObjectsBySource[key] = new List<object> { complexType };
         }
 
+        public IObjectMappingData<TNewSource, TTarget> WithSource<TNewSource>(TNewSource newSource)
+            => With(newSource, Target, isForDerivedTypeMapping: false);
+
         public IObjectMappingData<TNewSource, TNewTarget> WithSourceType<TNewSource, TNewTarget>(bool isForDerivedTypeMapping)
             where TNewSource : class
         {
-            return As(Source as TNewSource, default(TNewTarget), isForDerivedTypeMapping);
+            return With(Source as TNewSource, default(TNewTarget), isForDerivedTypeMapping);
         }
 
         public IObjectMappingData<TNewSource, TNewTarget> WithTargetType<TNewSource, TNewTarget>(bool isForDerivedTypeMapping)
             where TNewTarget : class
         {
-            return As(default(TNewSource), Target as TNewTarget, isForDerivedTypeMapping);
+            return With(default(TNewSource), Target as TNewTarget, isForDerivedTypeMapping);
         }
 
         public IObjectMappingData WithSource(IQualifiedMember newSourceMember)
         {
-            var sourceMemberRuntimeType = GetSourceMemberRuntimeType(newSourceMember);
+            var newSourceMappingData = WithTypes(
+                GetSourceMemberRuntimeType(newSourceMember),
+                MapperData.TargetType,
+                IsPartOfDerivedTypeMapping);
 
-            var newSourceMappingData = WithTypes(sourceMemberRuntimeType, MapperData.TargetType, isForDerivedTypeMapping: false);
+            newSourceMappingData.MapperKey = MappingContext
+                .RuleSet
+                .RootMapperKeyFactory
+                .CreateRootKeyFor(newSourceMappingData);
 
-            newSourceMappingData.MapperKey = MappingContext.RuleSet.RootMapperKeyFactory.CreateRootKeyFor(newSourceMappingData);
+            newSourceMappingData.MapperData.OriginalMapperData = MapperData;
+            newSourceMappingData.MapperData.Context.IsForToTargetMapping = true;
 
             return newSourceMappingData;
         }
@@ -389,26 +405,25 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
             return (IObjectMappingData)typedAsCaller.Invoke(this, isForDerivedTypeMapping);
         }
 
-        public IObjectMappingData<TNewSource, TNewTarget> As<TNewSource, TNewTarget>()
-            where TNewSource : class
-            where TNewTarget : class
-        {
-            return As<TNewSource, TNewTarget>(isForDerivedTypeMapping: true);
-        }
-
         public IObjectMappingData<TNewSource, TNewTarget> As<TNewSource, TNewTarget>(bool isForDerivedTypeMapping)
             where TNewSource : class
             where TNewTarget : class
         {
-            return As(Source as TNewSource, Target as TNewTarget, isForDerivedTypeMapping);
+            return With(Source as TNewSource, Target as TNewTarget, isForDerivedTypeMapping);
         }
 
-        private IObjectMappingData<TNewSource, TNewTarget> As<TNewSource, TNewTarget>(
+        private IObjectMappingData<TNewSource, TNewTarget> With<TNewSource, TNewTarget>(
             TNewSource typedSource,
             TNewTarget typedTarget,
             bool isForDerivedTypeMapping)
         {
-            var mapperKey = MapperKey.WithTypes<TNewSource, TNewTarget>();
+            if (MapperKey == null)
+            {
+                EnsureRootMapperKey();
+            }
+
+            var forceNewKey = isForDerivedTypeMapping && MapperKey.MappingTypes.TargetType.IsInterface();
+            var mapperKey = MapperKey.WithTypes(typeof(TNewSource), typeof(TNewTarget), forceNewKey);
 
             return new ObjectMappingData<TNewSource, TNewTarget>(
                 typedSource,

@@ -299,16 +299,16 @@ namespace AgileObjects.AgileMapper.Members.Dictionaries
                 return value.GetConversionTo(ValueType);
             }
 
-
-            if ((value.NodeType != Block) && (value.NodeType != Try))
+            if ((value.NodeType != Block) && (value.NodeType != Try) || mapperData.TargetIsDefinitelyUnpopulated())
             {
                 return null;
             }
 
+            // TODO: Cover: Existing nested dictionaries?
             var checkedAccess = GetAccessChecked(mapperData);
             var existingValue = checkedAccess.Variables.First();
 
-            if (value.NodeType != Block)
+            if (value.NodeType == Try)
             {
                 return GetCheckedTryCatch((TryExpression)value, keyedAccess, checkedAccess, existingValue);
             }

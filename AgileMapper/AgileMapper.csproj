@@ -18,9 +18,10 @@
     <GenerateAssemblyDescriptionAttribute>false</GenerateAssemblyDescriptionAttribute>
     <RootNamespace>AgileObjects.AgileMapper</RootNamespace>
     <Copyright>Copyright © AgileObjects Ltd 2019</Copyright>
-    <PackageReleaseNotes>- Improved support for non-standard collections
-- Support for composite keys in .IdentityUsing()
-- Updating to ReadableExpressions v2.1.1</PackageReleaseNotes>
+    <PackageReleaseNotes>- Support for mapping callbacks in .ToTarget() data sources
+- Fixing constructability check for .ToTarget() data sources re: #129
+- Fixing .ToTarget() calls with source Dictionaries
+- Performance improvements</PackageReleaseNotes>
   </PropertyGroup>
 
   <ItemGroup>
@@ -45,7 +46,7 @@
   </ItemGroup>
 
   <PropertyGroup Condition=" '$(TargetFramework)' == 'net40' ">
-    <DefineConstants>$(DefineConstants);FEATURE_SERIALIZATION;FEATURE_DYNAMIC;FEATURE_COLLECTION_CAPACITY;FEATURE_ISET;NET_40;</DefineConstants>
+    <DefineConstants>$(DefineConstants);FEATURE_SERIALIZATION;FEATURE_DYNAMIC;FEATURE_ISET;NET_40;</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup Condition=" '$(TargetFramework)' == 'netstandard1.0' ">
@@ -69,7 +70,7 @@
   </ItemGroup>
 
   <PropertyGroup Condition=" '$(TargetFramework)' == 'netstandard1.3' ">
-    <DefineConstants>$(DefineConstants);NET_STANDARD;FEATURE_SERIALIZATION;FEATURE_DYNAMIC;FEATURE_COLLECTION_CAPACITY;FEATURE_ISET;FEATURE_FAST_COMPILE;</DefineConstants>
+    <DefineConstants>$(DefineConstants);NET_STANDARD;NET_STANDARD_2;FEATURE_SERIALIZATION;FEATURE_DYNAMIC;FEATURE_COLLECTION_CAPACITY;FEATURE_ISET;FEATURE_FAST_COMPILE;</DefineConstants>
   </PropertyGroup>
 
 </Project>

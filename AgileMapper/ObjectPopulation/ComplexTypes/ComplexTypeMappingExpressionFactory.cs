@@ -1,16 +1,16 @@
 namespace AgileObjects.AgileMapper.ObjectPopulation.ComplexTypes
 {
     using System.Collections.Generic;
-    using Extensions.Internal;
-    using Members;
-    using NetStandardPolyfills;
-    using ReadableExpressions;
-    using ReadableExpressions.Extensions;
 #if NET35
     using Microsoft.Scripting.Ast;
 #else
     using System.Linq.Expressions;
 #endif
+    using Extensions.Internal;
+    using Members;
+    using NetStandardPolyfills;
+    using ReadableExpressions;
+    using ReadableExpressions.Extensions;
 
     internal class ComplexTypeMappingExpressionFactory : MappingExpressionFactoryBase
     {
@@ -42,14 +42,14 @@ namespace AgileObjects.AgileMapper.ObjectPopulation.ComplexTypes
                 return base.TargetCannotBeMapped(mappingData, out nullMappingBlock);
             }
 
-            if (mappingData.MapperData.MapperContext.ConstructionFactory.GetNewObjectCreation(mappingData) != null)
+            if (mappingData.IsTargetConstructable())
             {
                 return base.TargetCannotBeMapped(mappingData, out nullMappingBlock);
             }
 
             var targetType = mappingData.MapperData.TargetType;
 
-            if (targetType.IsAbstract() && mappingData.MapperData.GetDerivedTargetTypes().Any())
+            if (targetType.IsAbstract() && DerivedTypesExistForTarget(mappingData))
             {
                 return base.TargetCannotBeMapped(mappingData, out nullMappingBlock);
             }
@@ -59,6 +59,19 @@ namespace AgileObjects.AgileMapper.ObjectPopulation.ComplexTypes
                 targetType.ToDefaultExpression());
 
             return true;
+        }
+
+        private static bool DerivedTypesExistForTarget(IObjectMappingData mappingData)
+        {
+            var configuredImplementationTypePairs = mappingData
+                .MapperData
+                .MapperContext
+                .UserConfigurations
+                .DerivedTypes
+                .GetImplementationTypePairsFor(mappingData.MapperData, mappingData.MapperData.MapperContext);
+
+            return configuredImplementationTypePairs.Any() ||
+                   mappingData.MapperData.GetDerivedTargetTypes().Any();
         }
 
         #region Short-Circuits

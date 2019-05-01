@@ -10,6 +10,7 @@
     using Extensions;
     using Extensions.Internal;
     using NetStandardPolyfills;
+    using ObjectPopulation;
     using ReadableExpressions;
     using ReadableExpressions.Extensions;
 #if NET35
@@ -251,7 +252,7 @@
             => targetMember.GetAccess(instance).AssignTo(value);
 
         private static Expression CallSetMethod(Expression instance, Member targetMember, Expression value)
-            => Expression.Call(instance, targetMember.Name, NoTypeArguments, value);
+            => Expression.Call(instance, targetMember.Name, EmptyTypeArray, value);
 
         #endregion
 
@@ -267,12 +268,16 @@
         public static QualifiedMember ToSourceMember(this LinqExp.Expression memberAccess, MapperContext mapperContext)
             => memberAccess.ToDlrExpression().ToSourceMember(mapperContext);
 #endif
-        public static QualifiedMember ToSourceMember(this Expression memberAccess, MapperContext mapperContext)
+        public static QualifiedMember ToSourceMember(
+            this Expression memberAccess,
+            MapperContext mapperContext,
+            Action<ExpressionType> nonMemberAction = null)
         {
             return CreateMember(
                 memberAccess,
                 RootSource,
                 GlobalContext.Instance.MemberCache.GetSourceMembers,
+                nonMemberAction ?? ThrowIfUnsupported,
                 mapperContext);
         }
 
@@ -282,13 +287,10 @@
             MapperContext mapperContext,
             out string failureReason)
         {
-            QualifiedMember targetMember;
+            var hasUnsupportedNodeType = false;
+            var targetMember = memberAccess.ToTargetMember(mapperContext, nt => hasUnsupportedNodeType = true);
 
-            try
-            {
-                targetMember = memberAccess.ToTargetMember(mapperContext);
-            }
-            catch (NotSupportedException)
+            if (hasUnsupportedNodeType)
             {
                 failureReason = $"Unable to determine target member from '{memberAccess.Body.ToReadableString()}'";
                 return null;
@@ -319,35 +321,54 @@
 #if NET35
         public static QualifiedMember ToTargetMember(this LinqExp.LambdaExpression memberAccess, MapperContext mapperContext)
             => memberAccess.ToDlrExpression().ToTargetMember(mapperContext);
+
+        public static QualifiedMember ToTargetMember(
+            this LinqExp.LambdaExpression memberAccess,
+            MapperContext mapperContext,
+            Action<ExpressionType> nonMemberAction)
+        {
+            return memberAccess.ToDlrExpression().ToTargetMember(mapperContext, nonMemberAction);
+        }
 #endif
-        public static QualifiedMember ToTargetMember(this LambdaExpression memberAccess, MapperContext mapperContext)
+        public static QualifiedMember ToTargetMember(
+            this LambdaExpression memberAccess,
+            MapperContext mapperContext,
+            Action<ExpressionType> nonMemberAction = null)
         {
             return CreateMember(
                 memberAccess.Body,
                 RootTarget,
                 GlobalContext.Instance.MemberCache.GetTargetMembers,
+                nonMemberAction ?? ThrowIfUnsupported,
                 mapperContext);
         }
+
+        private static void ThrowIfUnsupported(ExpressionType unsupportedNodeType) =>
+            throw new NotSupportedException($"Unable to get member access from {unsupportedNodeType} Expression");
 
         private static QualifiedMember CreateMember(
             Expression memberAccessExpression,
             Func<Type, Member> rootMemberFactory,
             Func<Type, IList<Member>> membersFactory,
+            Action<ExpressionType> nonMemberAction,
             MapperContext mapperContext)
         {
-            void ThrowIfUnsupported(ExpressionType unsupportedNodeType) =>
-                throw new NotSupportedException($"Unable to get member access from {unsupportedNodeType} Expression");
+            var memberAccesses = memberAccessExpression.GetMemberAccessChain(nonMemberAction, out var rootExpression);
 
-            var memberAccesses = memberAccessExpression.GetMemberAccessChain(ThrowIfUnsupported, out var rootExpression);
+            if (memberAccesses.None())
+            {
+                return null;
+            }
+
             var rootMember = rootMemberFactory.Invoke(rootExpression.Type);
             var parentMember = rootMember;
 
             var memberChain = new Member[memberAccesses.Count + 1];
             memberChain[0] = rootMember;
 
-            for (var i = 0; i < memberAccesses.Count; i++)
+            for (var i = 0; i < memberAccesses.Count;)
             {
-                var memberAccess = memberAccesses[i];
+                var memberAccess = memberAccesses[i++];
                 var memberName = GetMemberName(memberAccess);
                 var members = membersFactory.Invoke(parentMember.Type);
                 var member = members.FirstOrDefault(m => m.Name == memberName);
@@ -357,7 +378,7 @@
                     return null;
                 }
 
-                memberChain[i + 1] = member;
+                memberChain[i] = member;
                 parentMember = member;
             }
 
@@ -378,11 +399,16 @@
 
                 if (memberExpression == null)
                 {
-                    return null;
+                    return Enumerable<Expression>.EmptyArray;
                 }
 
                 memberAccesses.Insert(0, memberExpression);
                 rootExpression = memberExpression.GetParentOrNull();
+
+                if (rootExpression == null)
+                {
+                    return Enumerable<Expression>.EmptyArray;
+                }
             }
 
             AdjustMemberAccessesIfRootedInMappingData(memberAccesses, ref rootExpression);
@@ -418,12 +444,19 @@
 
         private static void AdjustMemberAccessesIfRootedInMappingData(IList<Expression> memberAccesses, ref Expression expression)
         {
-            if (!expression.Type.IsClosedTypeOf(typeof(IMappingData<,>)))
+            if (!expression.Type.IsClosedTypeOf(typeof(IMappingData<,>)) &&
+                !expression.Type.IsClosedTypeOf(typeof(IObjectMappingData<,>)))
             {
                 return;
             }
 
             var mappingDataRoot = memberAccesses[0];
+
+            if (mappingDataRoot.NodeType != ExpressionType.MemberAccess)
+            {
+                return;
+            }
+
             expression = Parameters.Create(mappingDataRoot.Type);
 
             memberAccesses.RemoveAt(0);

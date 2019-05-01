@@ -3,15 +3,16 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
     using System;
     using System.Collections.Generic;
     using System.Linq;
-    using Configuration;
-    using Extensions;
-    using Extensions.Internal;
-    using Members;
 #if NET35
     using Microsoft.Scripting.Ast;
 #else
     using System.Linq.Expressions;
 #endif
+    using Configuration;
+    using Extensions;
+    using Extensions.Internal;
+    using Members;
+    using NetStandardPolyfills;
 
     internal static class DerivedComplexTypeMappingsFactory
     {
@@ -19,14 +20,14 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
         {
             var declaredTypeMapperData = declaredTypeMappingData.MapperData;
 
-            if (declaredTypeMapperData.Context.IsForDerivedType || declaredTypeMapperData.HasSameSourceAsParent())
+            if (DoNotMapDerivedTypes(declaredTypeMapperData))
             {
                 return Constants.EmptyExpression;
             }
 
             var derivedSourceTypes = declaredTypeMapperData.RuleSet.Settings.CheckDerivedSourceTypes
                 ? declaredTypeMapperData.GetDerivedSourceTypes()
-                : Enumerable<Type>.EmptyArray;
+                : Constants.EmptyTypeArray;
 
             var derivedTargetTypes = GetDerivedTargetTypesIfNecessary(declaredTypeMappingData);
             var derivedTypePairs = GetTypePairsFor(declaredTypeMapperData, declaredTypeMapperData);
@@ -74,11 +75,21 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
                     : Expression.Block(derivedTypeMappingExpressions);
         }
 
+        private static bool DoNotMapDerivedTypes(IMemberMapperData mapperData)
+        {
+            if (mapperData.Context.IsForDerivedType)
+            {
+                return !mapperData.TargetType.IsInterface();
+            }
+
+            return mapperData.HasSameSourceAsParent();
+        }
+
         private static ICollection<Type> GetDerivedTargetTypesIfNecessary(IObjectMappingData mappingData)
         {
             if (mappingData.MapperData.TargetIsDefinitelyUnpopulated())
             {
-                return Enumerable<Type>.EmptyArray;
+                return Constants.EmptyTypeArray;
             }
 
             return mappingData.MapperData.GetDerivedTargetTypes();
@@ -99,12 +110,26 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
             {
                 var condition = GetTypePairCondition(derivedTypePair, declaredTypeMapperData);
 
+                var sourceValue = GetDerivedTypeSourceValue(
+                    derivedTypePair,
+                    declaredTypeMappingData,
+                    out var sourceValueCondition);
+
                 var derivedTypeMapping = DerivedMappingFactory.GetDerivedTypeMapping(
                     declaredTypeMappingData,
-                    declaredTypeMapperData.SourceObject,
+                    sourceValue,
                     derivedTypePair.DerivedTargetType);
 
+                if (sourceValueCondition != null)
+                {
+                    derivedTypeMapping = Expression.Condition(
+                        sourceValueCondition,
+                        derivedTypeMapping,
+                        derivedTypeMapping.Type.ToDefaultExpression());
+                }
+
                 var returnMappingResult = Expression.Return(declaredTypeMapperData.ReturnLabelTarget, derivedTypeMapping);
+
                 declaredTypeHasUnconditionalTypePair = (condition == null);
 
                 if (declaredTypeHasUnconditionalTypePair)
@@ -121,18 +146,57 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
             declaredTypeHasUnconditionalTypePair = false;
         }
 
-        private static Expression GetTypePairCondition(DerivedTypePair derivedTypePair, IMemberMapperData mapperData)
+        private static Expression GetTypePairCondition(DerivedTypePair derivedTypePair, IMemberMapperData declaredTypeMapperData)
         {
-            var condition = GetTargetValidCheckOrNull(derivedTypePair.DerivedTargetType, mapperData);
+            var condition = GetTargetValidCheckOrNull(derivedTypePair.DerivedTargetType, declaredTypeMapperData);
 
             if (!derivedTypePair.HasConfiguredCondition)
             {
                 return condition;
             }
 
-            var pairCondition = derivedTypePair.GetConditionOrNull(mapperData);
+            var pairCondition = derivedTypePair.GetConditionOrNull(declaredTypeMapperData);
 
             return (condition != null) ? Expression.AndAlso(pairCondition, condition) : pairCondition;
+        }
+
+        private static Expression GetDerivedTypeSourceValue(
+            DerivedTypePair derivedTypePair,
+            IObjectMappingData declaredTypeMappingData,
+            out Expression sourceValueCondition)
+        {
+            if (!derivedTypePair.IsImplementationPairing)
+            {
+                sourceValueCondition = null;
+                return declaredTypeMappingData.MapperData.SourceObject;
+            }
+
+            var implementationMappingData = declaredTypeMappingData
+                .WithTypes(derivedTypePair.DerivedSourceType, derivedTypePair.DerivedTargetType);
+
+            if (implementationMappingData.IsTargetConstructable())
+            {
+                sourceValueCondition = null;
+                return declaredTypeMappingData.MapperData.SourceObject;
+            }
+
+            // Derived Type is an implementation Type for an unconstructable target Type,
+            // and is itself unconstructable; only way we get here is if a ToTarget data
+            // source has been configured:
+            var toTargetDataSource = implementationMappingData
+                .GetToTargetDataSourceOrNullForTargetType();
+
+            sourceValueCondition = toTargetDataSource.IsConditional
+                ? toTargetDataSource.Condition.Replace(
+                    implementationMappingData.MapperData.SourceObject,
+                    declaredTypeMappingData.MapperData.SourceObject,
+                    ExpressionEvaluation.Equivalator)
+                : null;
+
+            return toTargetDataSource.Value.Replace(
+                implementationMappingData.MapperData.SourceObject,
+                declaredTypeMappingData.MapperData.SourceObject,
+                ExpressionEvaluation.Equivalator);
         }
 
         private static void AddDerivedSourceTypeMappings(
