@@ -1,6 +1,6 @@
 ﻿/*
 The MIT License (MIT)
-Copyright (c) 2016 Maksim Volkau
+Copyright (c) 2016-2019 Maksim Volkau
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
 in the Software without restriction, including without limitation the rights
@@ -20,25 +20,21 @@ THE SOFTWARE.
 
 // ReSharper disable CoVariantArrayConversion
 
-#if LIGHT_EXPRESSION
-namespace FastExpressionCompiler.LightExpression
-#else
 namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
-#endif
 {
     using System;
     using System.Collections.Generic;
     using System.Linq;
-    using System.Reflection;
-    using System.Reflection.Emit;
-    using Internal;
-    using NetStandardPolyfills;
-    using ReadableExpressions.Extensions;
 #if NET35
     using Microsoft.Scripting.Ast;
 #else
     using System.Linq.Expressions;
 #endif
+    using System.Reflection;
+    using System.Reflection.Emit;
+    using Internal;
+    using NetStandardPolyfills;
+    using ReadableExpressions.Extensions;
 
     /// <summary>Compiles expression to delegate ~20 times faster than Expression.Compile.
     /// Partial to extend with your things when used as source file.</summary>
@@ -46,6 +42,8 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
     internal static partial class ExpressionCompiler
     {
 #if !FEATURE_FAST_COMPILE
+        public static Delegate CompileFast(this LambdaExpression lambdaExpr) => lambdaExpr.Compile();
+
         public static Func<TR> CompileFast<TR>(this Expression<Func<TR>> lambdaExpr) => lambdaExpr.Compile();
 
         public static Func<T, TR> CompileFast<T, TR>(this Expression<Func<T, TR>> lambdaExpr) => lambdaExpr.Compile();
@@ -62,6 +60,23 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
         }
 #else
         #region Expression.CompileFast overloads for Delegate, Funcs, and Actions
+
+        public static Delegate CompileFast(this LambdaExpression lambdaExpr)
+        {
+            var ignored = new ClosureInfo(false);
+
+            return (Delegate)TryCompile(ref ignored,
+                       lambdaExpr.Type, Tools.GetParamTypes(lambdaExpr.Parameters),
+                       lambdaExpr.ReturnType, lambdaExpr.Body, lambdaExpr.Parameters)
+                   ?? lambdaExpr.CompileSys();
+        }
+
+        public static Delegate CompileSys(this LambdaExpression lambdaExpr) =>
+            lambdaExpr
+#if LIGHT_EXPRESSION
+                .ToLambdaExpression()
+#endif
+                .Compile();
 
         public static TDelegate CompileFast<TDelegate>(this LambdaExpression lambdaExpr)
             where TDelegate : class
@@ -99,7 +114,7 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
             return TryCompile<Func<TR>>(
                    lambdaExpr.Body,
                    lambdaExpr.Parameters,
-                   Constants.NoTypeArguments,
+                   Constants.EmptyTypeArray,
                    typeof(TR))
                 ?? lambdaExpr.CompileSys();
         }
@@ -352,7 +367,7 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
             public BlockInfo CurrentBlock;
 
             // Dictionary for the used Labels in IL
-            public KeyValuePair<LabelTarget, Label?>[] Labels;
+            private KeyValuePair<LabelTarget, Label?>[] _labels;
 
             // Populates info directly with provided closure object and constants.
             public ClosureInfo(bool isConstructed, object closure = null,
@@ -364,7 +379,7 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                 NestedLambdas = Enumerable<NestedLambdaInfo>.EmptyArray;
                 NestedLambdaExprs = Enumerable<LambdaExpression>.EmptyArray;
                 CurrentBlock = BlockInfo.Empty;
-                Labels = null;
+                _labels = null;
                 LastEmitIsAddress = false;
 
                 if (closure == null)
@@ -410,6 +425,31 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                     NestedLambdaExprs = NestedLambdaExprs.Append(lambdaExpr);
                 }
             }
+
+            public void AddLabel(LabelTarget labelTarget)
+            {
+                if ((labelTarget != null) && (_labels.GetFirstIndex(kvp => kvp.Key == labelTarget) == -1))
+                {
+                    _labels = _labels.Append(new KeyValuePair<LabelTarget, Label?>(labelTarget, null));
+                }
+            }
+
+            public Label GetOrCreateLabel(LabelTarget labelTarget, ILGenerator il)
+                => GetOrCreateLabel(GetLabelIndex(labelTarget), il);
+
+            public Label GetOrCreateLabel(int index, ILGenerator il)
+            {
+                var labelPair = _labels[index];
+                var label = labelPair.Value;
+                if (!label.HasValue)
+                {
+                    _labels[index] = new KeyValuePair<LabelTarget, Label?>(labelPair.Key, label = il.DefineLabel());
+                }
+
+                return label.Value;
+            }
+
+            public int GetLabelIndex(LabelTarget labelTarget) => _labels.GetFirstIndex(kvp => kvp.Key == labelTarget);
 
             public object ConstructClosureTypeAndObject(bool constructTypeOnly)
             {
@@ -1019,6 +1059,13 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                         closure.PopBlock();
                         return true;
 
+                    case ExpressionType.Loop:
+                        var loopExpr = (LoopExpression)expr;
+                        closure.AddLabel(loopExpr.BreakLabel);
+                        closure.AddLabel(loopExpr.ContinueLabel);
+                        expr = loopExpr.Body;
+                        continue;
+
                     case ExpressionType.Index:
                         var indexExpr = (IndexExpression)expr;
                         if (!TryCollectBoundConstants(ref closure, indexExpr.Arguments, paramExprs))
@@ -1040,8 +1087,7 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                     case ExpressionType.Label:
                         var labelExpr = (LabelExpression)expr;
                         var defaultValueExpr = labelExpr.DefaultValue;
-                        closure.Labels = closure.Labels
-                            .Append(new KeyValuePair<LabelTarget, Label?>(labelExpr.Target, null));
+                        closure.AddLabel(labelExpr.Target);
                         if (defaultValueExpr == null)
                         {
                             return true;
@@ -1410,6 +1456,33 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                             closure.PopBlock();
                             return true;
 
+                        case ExpressionType.Loop:
+                            var loopExpr = (LoopExpression)expr;
+
+                            // Mark the start of the loop body:
+                            var loopBodyLabel = il.DefineLabel();
+                            il.MarkLabel(loopBodyLabel);
+
+                            if (loopExpr.ContinueLabel != null)
+                            {
+                                il.MarkLabel(closure.GetOrCreateLabel(loopExpr.ContinueLabel, il));
+                            }
+
+                            if (!TryEmit(loopExpr.Body, paramExprs, il, ref closure, parent))
+                            {
+                                return false;
+                            }
+
+                            // If loop hasn't exited, jump back to start of its body:
+                            il.Emit(OpCodes.Br_S, loopBodyLabel);
+
+                            if (loopExpr.BreakLabel != null)
+                            {
+                                il.MarkLabel(closure.GetOrCreateLabel(loopExpr.BreakLabel, il));
+                            }
+
+                            return true;
+
                         case ExpressionType.Try:
                             return TryEmitTryCatchFinallyBlock((TryExpression)expr, paramExprs, il, ref closure,
                                 parent);
@@ -1417,12 +1490,12 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                         case ExpressionType.Throw:
                             {
                                 var opExpr = ((UnaryExpression)expr).Operand;
-                                if (!TryEmit(opExpr, paramExprs, il, ref closure, parent))
+                                if (!TryEmit(opExpr, paramExprs, il, ref closure, parent & ~ParentFlags.IgnoreResult))
                                 {
                                     return false;
                                 }
 
-                                il.ThrowException(opExpr.Type);
+                                il.Emit(OpCodes.Throw);
                                 return true;
                             }
 
@@ -1472,20 +1545,16 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
             private static bool TryEmitLabel(LabelExpression expr,
                 IList<ParameterExpression> paramExprs, ILGenerator il, ref ClosureInfo closure, ParentFlags parent)
             {
-                var index = closure.Labels.GetFirstIndex(x => x.Key == expr.Target);
+                var index = closure.GetLabelIndex(expr.Target);
                 if (index == -1)
                 {
                     return false; // should be found in first collecting constants round
                 }
 
                 // define a new label or use the label provided by the preceding GoTo expression
-                var label = closure.Labels[index].Value;
-                if (!label.HasValue)
-                {
-                    closure.Labels[index] = new KeyValuePair<LabelTarget, Label?>(expr.Target, label = il.DefineLabel());
-                }
+                var label = closure.GetOrCreateLabel(index, il);
 
-                il.MarkLabel(label.Value);
+                il.MarkLabel(label);
 
                 return expr.DefaultValue == null || TryEmit(expr.DefaultValue, paramExprs, il, ref closure, parent);
             }
@@ -1493,26 +1562,28 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
             // todo: GotoExpression.Value 
             private static bool TryEmitGoto(GotoExpression expr, ILGenerator il, ref ClosureInfo closure)
             {
-                var index = closure.Labels.GetFirstIndex(x => x.Key == expr.Target);
+                var index = closure.GetLabelIndex(expr.Target);
                 if (index == -1)
                 {
                     throw new InvalidOperationException("Cannot jump, no labels found");
                 }
 
                 // use label defined by Label expression or define its own to use by subsequent Label
-                var label = closure.Labels[index].Value;
-                if (!label.HasValue)
-                {
-                    closure.Labels[index] = new KeyValuePair<LabelTarget, Label?>(expr.Target, label = il.DefineLabel());
-                }
+                var label = closure.GetOrCreateLabel(index, il);
 
-                if (expr.Kind == GotoExpressionKind.Goto)
+                switch (expr.Kind)
                 {
-                    il.Emit(OpCodes.Br, label.Value);
-                    return true;
-                }
+                    case GotoExpressionKind.Goto:
+                        il.Emit(OpCodes.Br, label);
+                        return true;
 
-                return false;
+                    case GotoExpressionKind.Break:
+                        il.Emit(OpCodes.Br_S, label);
+                        return true;
+
+                    default:
+                        return false;
+                }
             }
 
             private static bool TryEmitIndex(IndexExpression expr, ILGenerator il)
@@ -1996,8 +2067,15 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                 }
                 else
                 {
-                    il.Emit(OpCodes.Ldc_I4_0);
-                    il.Emit(OpCodes.Ceq);
+                    if (expr.Type == typeof(bool))
+                    {
+                        il.Emit(OpCodes.Ldc_I4_0);
+                        il.Emit(OpCodes.Ceq);
+                    }
+                    else
+                    {
+                        il.Emit(OpCodes.Not);
+                    }
                 }
                 return true;
             }
@@ -2022,8 +2100,7 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                 {
                     if (targetType == underlyingNullableSourceType)
                     {
-                        if (!TryEmit(opExpr, paramExprs, il, ref closure,
-                            parent & ~ParentFlags.IgnoreResult | ParentFlags.InstanceAccess))
+                        if (!TryEmit(opExpr, paramExprs, il, ref closure, parent & ~ParentFlags.IgnoreResult | ParentFlags.InstanceAccess))
                         {
                             return false;
                         }
@@ -2752,6 +2829,7 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                     case ExpressionType.Parameter:
                         var leftParamExpr = (ParameterExpression)left;
                         var paramIndex = paramExprs.GetFirstIndex(leftParamExpr);
+                        var arithmeticNodeType = Tools.GetArithmeticFromArithmeticAssignOrSelf(nodeType);
 
                         if (paramIndex != -1)
                         {
@@ -2769,55 +2847,48 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                             if (leftParamExpr.IsByRef)
                             {
                                 EmitLoadParamArg(il, paramIndex, false);
-
-                                var arithmeticNodeType = Tools.GetArithmeticFromArithmeticAssignOrSelf(nodeType);
-                                if (arithmeticNodeType == nodeType)
-                                {
-                                    if (!TryEmit(right, paramExprs, il, ref closure, flags))
-                                    {
-                                        return false;
-                                    }
-                                }
-                                else if (!TryEmitArithmetic(expr, arithmeticNodeType, paramExprs, il, ref closure, parent))
-                                {
-                                    return false;
-                                }
-
-                                EmitByRefStore(il, leftParamExpr.Type);
                             }
-                            else
+
+                            if (arithmeticNodeType == nodeType)
                             {
                                 if (!TryEmit(right, paramExprs, il, ref closure, flags))
                                 {
                                     return false;
                                 }
+                            }
+                            else if (!TryEmitArithmetic(expr, arithmeticNodeType, paramExprs, il, ref closure, parent))
+                            {
+                                return false;
+                            }
 
-                                if ((parent & ParentFlags.IgnoreResult) == 0)
-                                {
-                                    il.Emit(OpCodes.Dup); // dup value to assign and return
-                                }
+                            if ((parent & ParentFlags.IgnoreResult) == 0)
+                            {
+                                il.Emit(OpCodes.Dup); // dup value to assign and return
+                            }
 
+                            if (leftParamExpr.IsByRef)
+                            {
+                                EmitByRefStore(il, leftParamExpr.Type);
+                            }
+                            else
+                            {
                                 il.Emit(OpCodes.Starg_S, paramIndex);
                             }
 
                             return true;
                         }
-                        else
+                        else if (arithmeticNodeType != nodeType)
                         {
-                            var arithmeticNodeType = Tools.GetArithmeticFromArithmeticAssignOrSelf(nodeType);
-                            if (arithmeticNodeType != nodeType)
+                            var varIdx = closure.CurrentBlock.VarExprs.GetFirstIndex(leftParamExpr);
+                            if (varIdx != -1)
                             {
-                                var varIdx = closure.CurrentBlock.VarExprs.GetFirstIndex(leftParamExpr);
-                                if (varIdx != -1)
+                                if (!TryEmitArithmetic(expr, arithmeticNodeType, paramExprs, il, ref closure, parent))
                                 {
-                                    if (!TryEmitArithmetic(expr, arithmeticNodeType, paramExprs, il, ref closure, parent))
-                                    {
-                                        return false;
-                                    }
-
-                                    il.Emit(OpCodes.Stloc, closure.CurrentBlock.LocalVars[varIdx]);
-                                    return true;
+                                    return false;
                                 }
+
+                                il.Emit(OpCodes.Stloc, closure.CurrentBlock.LocalVars[varIdx]);
+                                return true;
                             }
                         }
 
@@ -3621,7 +3692,7 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                         return false;
                 }
 
-            nullCheck:
+                nullCheck:
                 if (leftIsNullable)
                 {
                     il.Emit(OpCodes.Ldloca_S, lVar);
@@ -4089,24 +4160,18 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
 
         public static Type[] GetParamTypes(IList<ParameterExpression> paramExprs)
         {
-            if (paramExprs == null || paramExprs.Count == 0)
+            switch (paramExprs.Count)
             {
-                return Constants.NoTypeArguments;
-            }
+                case 0:
+                    return Constants.EmptyTypeArray;
 
-            if (paramExprs.Count == 1)
-            {
-                return new[] { paramExprs[0].IsByRef ? paramExprs[0].Type.MakeByRefType() : paramExprs[0].Type };
-            }
+                case 1:
+                    return new[] { paramExprs[0].IsByRef ? paramExprs[0].Type.MakeByRefType() : paramExprs[0].Type };
 
-            var paramTypes = new Type[paramExprs.Count];
-            for (var i = 0; i < paramTypes.Length; i++)
-            {
-                var parameterExpr = paramExprs[i];
-                paramTypes[i] = parameterExpr.IsByRef ? parameterExpr.Type.MakeByRefType() : parameterExpr.Type;
+                default:
+                    return paramExprs.ProjectToArray(parameterExpr =>
+                        parameterExpr.IsByRef ? parameterExpr.Type.MakeByRefType() : parameterExpr.Type);
             }
-
-            return paramTypes;
         }
 
         public static Type GetFuncOrActionType(Type[] paramTypes, Type returnType)
