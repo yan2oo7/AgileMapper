@@ -68,7 +68,7 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
             return (Delegate)TryCompile(ref ignored,
                        lambdaExpr.Type, Tools.GetParamTypes(lambdaExpr.Parameters),
                        lambdaExpr.ReturnType, lambdaExpr.Body, lambdaExpr.Parameters)
-                   ?? lambdaExpr.CompileSys();
+                   ?? throw new NotSupportedException("Fast compilation not supported");
         }
 
         public static Delegate CompileSys(this LambdaExpression lambdaExpr) =>
@@ -86,11 +86,7 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                        lambdaExpr.Parameters,
                        Tools.GetParamTypes(lambdaExpr.Parameters),
                        lambdaExpr.ReturnType)
-                   ?? (TDelegate)(object)lambdaExpr
-#if LIGHT_EXPRESSION
-                       .ToLambdaExpression()
-#endif
-                       .Compile();
+                   ?? throw new NotSupportedException("Fast compilation not supported");
         }
 
         private static TDelegate CompileSys<TDelegate>(this Expression<TDelegate> lambdaExpr)
@@ -116,7 +112,7 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                    lambdaExpr.Parameters,
                    Constants.EmptyTypeArray,
                    typeof(TR))
-                ?? lambdaExpr.CompileSys();
+                ?? throw new NotSupportedException("Fast compilation not supported"); //lambdaExpr.CompileSys();
         }
 
         public static Func<T, TR> CompileFast<T, TR>(this Expression<Func<T, TR>> lambdaExpr)
@@ -126,7 +122,7 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                    lambdaExpr.Parameters,
                    new[] { typeof(T) },
                    typeof(TR))
-                   ?? lambdaExpr.CompileSys();
+                   ?? throw new NotSupportedException("Fast compilation not supported"); //lambdaExpr.CompileSys();
         }
 
         public static Func<T1, T2, TR> CompileFast<T1, T2, TR>(this Expression<Func<T1, T2, TR>> lambdaExpr)
@@ -136,7 +132,7 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                    lambdaExpr.Parameters,
                    new[] { typeof(T1), typeof(T2) },
                    typeof(TR))
-                   ?? lambdaExpr.CompileSys();
+                   ?? throw new NotSupportedException("Fast compilation not supported"); //lambdaExpr.CompileSys();
         }
 
         public static Func<T1, T2, T3, TR> CompileFast<T1, T2, T3, TR>(this Expression<Func<T1, T2, T3, TR>> lambdaExpr)
@@ -146,7 +142,7 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                lambdaExpr.Parameters,
                new[] { typeof(T1), typeof(T2), typeof(T3) },
                typeof(TR))
-                ?? lambdaExpr.CompileSys();
+                ?? throw new NotSupportedException("Fast compilation not supported"); //lambdaExpr.CompileSys();
         }
 
         #endregion
@@ -428,7 +424,7 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
 
             public void AddLabel(LabelTarget labelTarget)
             {
-                if ((labelTarget != null) && (_labels.GetFirstIndex(kvp => kvp.Key == labelTarget) == -1))
+                if ((labelTarget != null) && (GetLabelIndex(labelTarget) == -1))
                 {
                     _labels = _labels.Append(new KeyValuePair<LabelTarget, Label?>(labelTarget, null));
                 }
@@ -591,7 +587,7 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                     localVars = Enumerable<LocalBuilder>.EmptyArray;
                 }
 
-                CurrentBlock = new BlockInfo(CurrentBlock, blockVarExprs, localVars);
+                PushBlock(blockVarExprs, localVars);
             }
 
             public void PopBlock() =>
@@ -919,20 +915,20 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
         {
             public static readonly MethodInfo[] Methods = typeof(CurryClosureActions).GetPublicStaticMethods("Curry").ToArray();
 
-            internal static Action Curry<C>(Action<C> a, C c) => () => a(c);
-            internal static Action<T1> Curry<C, T1>(Action<C, T1> f, C c) => t1 => f(c, t1);
-            internal static Action<T1, T2> Curry<C, T1, T2>(Action<C, T1, T2> f, C c) => (t1, t2) => f(c, t1, t2);
+            public static Action Curry<C>(Action<C> a, C c) => () => a(c);
+            public static Action<T1> Curry<C, T1>(Action<C, T1> f, C c) => t1 => f(c, t1);
+            public static Action<T1, T2> Curry<C, T1, T2>(Action<C, T1, T2> f, C c) => (t1, t2) => f(c, t1, t2);
 
-            internal static Action<T1, T2, T3> Curry<C, T1, T2, T3>(Action<C, T1, T2, T3> f, C c) =>
+            public static Action<T1, T2, T3> Curry<C, T1, T2, T3>(Action<C, T1, T2, T3> f, C c) =>
                 (t1, t2, t3) => f(c, t1, t2, t3);
 
-            internal static Action<T1, T2, T3, T4> Curry<C, T1, T2, T3, T4>(Action<C, T1, T2, T3, T4> f, C c) =>
+            public static Action<T1, T2, T3, T4> Curry<C, T1, T2, T3, T4>(Action<C, T1, T2, T3, T4> f, C c) =>
                 (t1, t2, t3, t4) => f(c, t1, t2, t3, t4);
 
-            internal static Action<T1, T2, T3, T4, T5> Curry<C, T1, T2, T3, T4, T5>(Action<C, T1, T2, T3, T4, T5> f,
+            public static Action<T1, T2, T3, T4, T5> Curry<C, T1, T2, T3, T4, T5>(Action<C, T1, T2, T3, T4, T5> f,
                 C c) => (t1, t2, t3, t4, t5) => f(c, t1, t2, t3, t4, t5);
 
-            internal static Action<T1, T2, T3, T4, T5, T6>
+            public static Action<T1, T2, T3, T4, T5, T6>
                 Curry<C, T1, T2, T3, T4, T5, T6>(Action<C, T1, T2, T3, T4, T5, T6> f, C c) =>
                 (t1, t2, t3, t4, t5, t6) => f(c, t1, t2, t3, t4, t5, t6);
         }
@@ -1474,7 +1470,7 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                             }
 
                             // If loop hasn't exited, jump back to start of its body:
-                            il.Emit(OpCodes.Br_S, loopBodyLabel);
+                            il.Emit(OpCodes.Br, loopBodyLabel);
 
                             if (loopExpr.BreakLabel != null)
                             {
@@ -1575,10 +1571,7 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                 {
                     case GotoExpressionKind.Goto:
                         il.Emit(OpCodes.Br, label);
-                        return true;
-
-                    case GotoExpressionKind.Break:
-                        il.Emit(OpCodes.Br_S, label);
+                        il.Emit(OpCodes.Br, label);
                         return true;
 
                     default:
@@ -1739,7 +1732,6 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
 
                 return true;
             }
-
 
             private static bool TryEmitTryCatchFinallyBlock(TryExpression tryExpr,
                 IList<ParameterExpression> paramExprs, ILGenerator il, ref ClosureInfo closure, ParentFlags parent)
@@ -2759,55 +2751,67 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
 
             private static bool TryEmitIncDecAssign(UnaryExpression expr, ILGenerator il, ref ClosureInfo closure, ParentFlags parent)
             {
-                var varIdx = closure.CurrentBlock.VarExprs.GetFirstIndex((ParameterExpression)expr.Operand);
-                if (varIdx == -1)
+                var localVar = closure.GetDefinedLocalVarOrDefault((ParameterExpression)expr.Operand);
+
+                if (localVar == null)
                 {
                     return false;
                 }
 
-                il.Emit(OpCodes.Ldloc, closure.CurrentBlock.LocalVars[varIdx]);
+                il.Emit(OpCodes.Ldloc, localVar);
 
-                var nodeType = expr.NodeType;
-                if (nodeType == ExpressionType.PreIncrementAssign)
+                switch (expr.NodeType)
                 {
-                    il.Emit(OpCodes.Ldc_I4_1);
-                    il.Emit(OpCodes.Add);
-                    if ((parent & ParentFlags.IgnoreResult) == 0)
-                    {
-                        il.Emit(OpCodes.Dup);
-                    }
-                }
-                else if (nodeType == ExpressionType.PostIncrementAssign)
-                {
-                    if ((parent & ParentFlags.IgnoreResult) == 0)
-                    {
-                        il.Emit(OpCodes.Dup);
-                    }
+                    case ExpressionType.PreIncrementAssign:
+                        {
+                            il.Emit(OpCodes.Ldc_I4_1);
+                            il.Emit(OpCodes.Add);
+                            if ((parent & ParentFlags.IgnoreResult) == 0)
+                            {
+                                il.Emit(OpCodes.Dup);
+                            }
 
-                    il.Emit(OpCodes.Ldc_I4_1);
-                    il.Emit(OpCodes.Add);
-                }
-                else if (nodeType == ExpressionType.PreDecrementAssign)
-                {
-                    il.Emit(OpCodes.Ldc_I4_M1);
-                    il.Emit(OpCodes.Add);
-                    if ((parent & ParentFlags.IgnoreResult) == 0)
-                    {
-                        il.Emit(OpCodes.Dup);
-                    }
-                }
-                else if (nodeType == ExpressionType.PostDecrementAssign)
-                {
-                    if ((parent & ParentFlags.IgnoreResult) == 0)
-                    {
-                        il.Emit(OpCodes.Dup);
-                    }
+                            break;
+                        }
 
-                    il.Emit(OpCodes.Ldc_I4_M1);
-                    il.Emit(OpCodes.Add);
+                    case ExpressionType.PostIncrementAssign:
+                        {
+                            if ((parent & ParentFlags.IgnoreResult) == 0)
+                            {
+                                il.Emit(OpCodes.Dup);
+                            }
+
+                            il.Emit(OpCodes.Ldc_I4_1);
+                            il.Emit(OpCodes.Add);
+                            break;
+                        }
+
+                    case ExpressionType.PreDecrementAssign:
+                        {
+                            il.Emit(OpCodes.Ldc_I4_M1);
+                            il.Emit(OpCodes.Add);
+                            if ((parent & ParentFlags.IgnoreResult) == 0)
+                            {
+                                il.Emit(OpCodes.Dup);
+                            }
+
+                            break;
+                        }
+
+                    case ExpressionType.PostDecrementAssign:
+                        {
+                            if ((parent & ParentFlags.IgnoreResult) == 0)
+                            {
+                                il.Emit(OpCodes.Dup);
+                            }
+
+                            il.Emit(OpCodes.Ldc_I4_M1);
+                            il.Emit(OpCodes.Add);
+                            break;
+                        }
                 }
 
-                il.Emit(OpCodes.Stloc, closure.CurrentBlock.LocalVars[varIdx]);
+                il.Emit(OpCodes.Stloc, localVar);
                 return true;
             }
 
@@ -2879,15 +2883,15 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                         }
                         else if (arithmeticNodeType != nodeType)
                         {
-                            var varIdx = closure.CurrentBlock.VarExprs.GetFirstIndex(leftParamExpr);
-                            if (varIdx != -1)
+                            var localVar = closure.GetDefinedLocalVarOrDefault(leftParamExpr);
+                            if (localVar != null)
                             {
                                 if (!TryEmitArithmetic(expr, arithmeticNodeType, paramExprs, il, ref closure, parent))
                                 {
                                     return false;
                                 }
 
-                                il.Emit(OpCodes.Stloc, closure.CurrentBlock.LocalVars[varIdx]);
+                                il.Emit(OpCodes.Stloc, localVar);
                                 return true;
                             }
                         }
@@ -3692,7 +3696,7 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                         return false;
                 }
 
-                nullCheck:
+            nullCheck:
                 if (leftIsNullable)
                 {
                     il.Emit(OpCodes.Ldloca_S, lVar);
