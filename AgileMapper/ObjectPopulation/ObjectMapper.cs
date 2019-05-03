@@ -112,8 +112,7 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
                 return false;
             }
 
-            return _subMappersByKey == null || 
-                   _subMappersByKey.Values.All(subMapperByKey => subMapperByKey.IsStaticallyCacheable());
+            return _subMappersByKey?.Values.All(subMapperByKey => subMapperByKey.IsStaticallyCacheable()) == true;
         }
 
         public object Map(IObjectMappingData mappingData) => Map((ObjectMappingData<TSource, TTarget>)mappingData);
