@@ -1281,6 +1281,7 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
             Arithmetic = 1 << 4,
             Coalesce = 1 << 5,
             InstanceAccess = 1 << 6,
+            DupMemberOwner = 1 << 7,
             InstanceCall = Call | InstanceAccess
         }
 
@@ -1412,7 +1413,7 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                         case ExpressionType.PreIncrementAssign:
                         case ExpressionType.PostDecrementAssign:
                         case ExpressionType.PreDecrementAssign:
-                            return TryEmitIncDecAssign((UnaryExpression)expr, il, ref closure, parent);
+                            return TryEmitIncDecAssign((UnaryExpression)expr, paramExprs, il, ref closure, parent);
 
                         case ExpressionType arithmeticAssign
                             when Tools.GetArithmeticFromArithmeticAssignOrSelf(arithmeticAssign) != arithmeticAssign:
@@ -1569,8 +1570,8 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
 
                 switch (expr.Kind)
                 {
+                    case GotoExpressionKind.Break:
                     case GotoExpressionKind.Goto:
-                        il.Emit(OpCodes.Br, label);
                         il.Emit(OpCodes.Br, label);
                         return true;
 
@@ -2092,7 +2093,8 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                 {
                     if (targetType == underlyingNullableSourceType)
                     {
-                        if (!TryEmit(opExpr, paramExprs, il, ref closure, parent & ~ParentFlags.IgnoreResult | ParentFlags.InstanceAccess))
+                        if (!TryEmit(opExpr, paramExprs, il, ref closure,
+                            parent & ~ParentFlags.IgnoreResult | ParentFlags.InstanceAccess))
                         {
                             return false;
                         }
@@ -2104,10 +2106,6 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
 
                         return EmitMethodCall(il, sourceType.FindValueGetterMethod(), parent);
                     }
-                }
-                else
-                {
-                    underlyingNullableSourceType = null;
                 }
 
                 if (!TryEmit(opExpr, paramExprs, il, ref closure, parent & ~ParentFlags.IgnoreResult & ~ParentFlags.InstanceAccess))
@@ -2736,83 +2734,132 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
 
             private static bool EmitMemberAssign(ILGenerator il, MemberInfo member)
             {
-                switch (member)
+                if (member is PropertyInfo prop)
                 {
-                    case PropertyInfo prop:
-                        return EmitMethodCall(il, prop.GetSetter());
-
-                    case FieldInfo field:
-                        il.Emit(OpCodes.Stfld, field);
-                        return true;
+                    return EmitMethodCall(il, prop.GetSetter());
                 }
 
-                return false;
-            }
-
-            private static bool TryEmitIncDecAssign(UnaryExpression expr, ILGenerator il, ref ClosureInfo closure, ParentFlags parent)
-            {
-                var localVar = closure.GetDefinedLocalVarOrDefault((ParameterExpression)expr.Operand);
-
-                if (localVar == null)
+                if (!(member is FieldInfo field))
                 {
                     return false;
                 }
 
-                il.Emit(OpCodes.Ldloc, localVar);
+                il.Emit(field.IsStatic ? OpCodes.Stsfld : OpCodes.Stfld, field);
+                return true;
+            }
+
+            private static bool TryEmitIncDecAssign(UnaryExpression expr,
+                IList<ParameterExpression> paramExprs, ILGenerator il, ref ClosureInfo closure, ParentFlags parent)
+            {
+                LocalBuilder localVar;
+                MemberExpression memberAccess;
+                bool useLocalVar;
+
+                var isVar = expr.Operand.NodeType == ExpressionType.Parameter;
+                var usesResult = !parent.IgnoresResult();
+
+                if (isVar)
+                {
+                    localVar = closure.GetDefinedLocalVarOrDefault((ParameterExpression)expr.Operand);
+
+                    if (localVar == null)
+                    {
+                        return false;
+                    }
+
+                    memberAccess = null;
+                    useLocalVar = true;
+
+                    il.Emit(OpCodes.Ldloc, localVar);
+                }
+                else if (expr.Operand.NodeType == ExpressionType.MemberAccess)
+                {
+                    memberAccess = (MemberExpression)expr.Operand;
+
+                    if (!TryEmitMemberAccess(memberAccess, paramExprs, il, ref closure, parent | ParentFlags.DupMemberOwner))
+                    {
+                        return false;
+                    }
+
+                    useLocalVar = (memberAccess.Expression != null) && (usesResult || memberAccess.Member is PropertyInfo);
+                    localVar = useLocalVar ? il.DeclareLocal(expr.Operand.Type) : null;
+                }
+                else
+                {
+                    return false;
+                }
 
                 switch (expr.NodeType)
                 {
                     case ExpressionType.PreIncrementAssign:
-                        {
-                            il.Emit(OpCodes.Ldc_I4_1);
-                            il.Emit(OpCodes.Add);
-                            if ((parent & ParentFlags.IgnoreResult) == 0)
-                            {
-                                il.Emit(OpCodes.Dup);
-                            }
-
-                            break;
-                        }
+                        il.Emit(OpCodes.Ldc_I4_1);
+                        il.Emit(OpCodes.Add);
+                        StoreIncDecValue(il, usesResult, isVar, localVar);
+                        break;
 
                     case ExpressionType.PostIncrementAssign:
-                        {
-                            if ((parent & ParentFlags.IgnoreResult) == 0)
-                            {
-                                il.Emit(OpCodes.Dup);
-                            }
-
-                            il.Emit(OpCodes.Ldc_I4_1);
-                            il.Emit(OpCodes.Add);
-                            break;
-                        }
+                        StoreIncDecValue(il, usesResult, isVar, localVar);
+                        il.Emit(OpCodes.Ldc_I4_1);
+                        il.Emit(OpCodes.Add);
+                        break;
 
                     case ExpressionType.PreDecrementAssign:
-                        {
-                            il.Emit(OpCodes.Ldc_I4_M1);
-                            il.Emit(OpCodes.Add);
-                            if ((parent & ParentFlags.IgnoreResult) == 0)
-                            {
-                                il.Emit(OpCodes.Dup);
-                            }
-
-                            break;
-                        }
+                        il.Emit(OpCodes.Ldc_I4_M1);
+                        il.Emit(OpCodes.Add);
+                        StoreIncDecValue(il, usesResult, isVar, localVar);
+                        break;
 
                     case ExpressionType.PostDecrementAssign:
-                        {
-                            if ((parent & ParentFlags.IgnoreResult) == 0)
-                            {
-                                il.Emit(OpCodes.Dup);
-                            }
-
-                            il.Emit(OpCodes.Ldc_I4_M1);
-                            il.Emit(OpCodes.Add);
-                            break;
-                        }
+                        StoreIncDecValue(il, usesResult, isVar, localVar);
+                        il.Emit(OpCodes.Ldc_I4_M1);
+                        il.Emit(OpCodes.Add);
+                        break;
                 }
 
-                il.Emit(OpCodes.Stloc, localVar);
+                if (isVar || (useLocalVar && !usesResult))
+                {
+                    il.Emit(OpCodes.Stloc, localVar);
+                }
+
+                if (isVar)
+                {
+                    return true;
+                }
+
+                if (useLocalVar && !usesResult)
+                {
+                    il.Emit(OpCodes.Ldloc, localVar);
+                }
+
+                if (!EmitMemberAssign(il, memberAccess.Member))
+                {
+                    return false;
+                }
+
+                if (useLocalVar && usesResult)
+                {
+                    il.Emit(OpCodes.Ldloc, localVar);
+                }
+
                 return true;
+            }
+
+            private static void StoreIncDecValue(ILGenerator il, bool usesResult, bool isVar, LocalBuilder localVar)
+            {
+                if (!usesResult)
+                {
+                    return;
+                }
+
+                if (isVar || (localVar == null))
+                {
+                    il.Emit(OpCodes.Dup);
+                }
+                else
+                {
+                    il.Emit(OpCodes.Stloc, localVar);
+                    il.Emit(OpCodes.Ldloc, localVar);
+                }
             }
 
             private static bool TryEmitAssign(BinaryExpression expr,
@@ -3184,12 +3231,21 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                 IList<ParameterExpression> paramExprs, ILGenerator il, ref ClosureInfo closure, ParentFlags parent)
             {
                 var prop = expr.Member as PropertyInfo;
+
                 var instanceExpr = expr.Expression;
-                if (instanceExpr != null &&
-                    !TryEmit(instanceExpr, paramExprs, il, ref closure,
-                        parent | (prop != null ? ParentFlags.Call : parent) | ParentFlags.MemberAccess | ParentFlags.InstanceAccess))
+                if (instanceExpr != null)
                 {
-                    return false;
+                    if (!TryEmit(instanceExpr, paramExprs, il, ref closure,
+                        ~ParentFlags.IgnoreResult & ~ParentFlags.DupMemberOwner &
+                        (parent | (prop != null ? ParentFlags.Call : parent) | ParentFlags.MemberAccess | ParentFlags.InstanceAccess)))
+                    {
+                        return false;
+                    }
+
+                    if ((parent & ParentFlags.DupMemberOwner) != 0)
+                    {
+                        il.Emit(OpCodes.Dup);
+                    }
                 }
 
                 if (prop != null)
@@ -3209,28 +3265,29 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
                 }
 
                 var field = expr.Member as FieldInfo;
-                if (field != null)
+
+                if (field == null)
                 {
-                    if (field.IsStatic)
+                    return false;
+                }
+
+                if (field.IsStatic)
+                {
+                    if (field.IsLiteral)
                     {
-                        if (field.IsLiteral)
-                        {
-                            TryEmitConstant(null, field.FieldType, field.GetValue(null), il, ref closure);
-                        }
-                        else
-                        {
-                            il.Emit(OpCodes.Ldsfld, field);
-                        }
+                        TryEmitConstant(null, field.FieldType, field.GetValue(null), il, ref closure);
                     }
                     else
                     {
-                        closure.LastEmitIsAddress = field.FieldType.IsValueType() && (parent & ParentFlags.InstanceAccess) != 0;
-                        il.Emit(closure.LastEmitIsAddress ? OpCodes.Ldflda : OpCodes.Ldfld, field);
+                        il.Emit(OpCodes.Ldsfld, field);
                     }
-                    return true;
                 }
-
-                return false;
+                else
+                {
+                    closure.LastEmitIsAddress = field.FieldType.IsValueType() && (parent & ParentFlags.InstanceAccess) != 0;
+                    il.Emit(closure.LastEmitIsAddress ? OpCodes.Ldflda : OpCodes.Ldfld, field);
+                }
+                return true;
             }
 
             // ReSharper disable once FunctionComplexityOverflow
@@ -4061,7 +4118,7 @@ namespace AgileObjects.AgileMapper.Extensions.Internal.Compilation
 
                 il.Emit(method.IsVirtual ? OpCodes.Callvirt : OpCodes.Call, method);
 
-                if ((parent & ParentFlags.IgnoreResult) != 0 && method.ReturnType != typeof(void))
+                if (parent.IgnoresResult() && method.ReturnType != typeof(void))
                 {
                     il.Emit(OpCodes.Pop);
                 }
