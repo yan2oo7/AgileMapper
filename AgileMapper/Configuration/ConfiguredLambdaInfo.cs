@@ -137,7 +137,8 @@
 
         #endregion
 
-        public bool UsesMappingDataObjectParameter => _parametersSwapper.HasMappingContextParameter;
+        public bool HasMappingDataObjectParameter
+            => _parametersSwapper.IsMappingContextParameterSignature;
 
         public Type ReturnType { get; }
 

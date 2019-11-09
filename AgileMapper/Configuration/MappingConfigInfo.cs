@@ -107,7 +107,7 @@
         #region Conditions
 
         public bool ConditionUsesMappingDataObjectParameter
-            => HasCondition && _conditionLambda.UsesMappingDataObjectParameter;
+            => HasCondition && _conditionLambda.HasMappingDataObjectParameter;
 
         public bool HasCondition => _conditionLambda != null;
 

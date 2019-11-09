@@ -190,7 +190,7 @@
 
             var mapperData = mapper.MapperData;
 
-            if (mapperData.Context.UsesMappingDataObject)
+            if (mapperData.Context.NeedsMappingDataObject)
             {
                 return UseLocalValueVariable(
                     mapperData.MappingDataObject,
@@ -292,7 +292,7 @@
             Expression toTargetDataSourceValue,
             Expression mappingExpression)
         {
-            if (!toTargetMapperData.Context.UsesMappingDataObject)
+            if (!toTargetMapperData.Context.NeedsMappingDataObject)
             {
                 return mappingExpression;
             }

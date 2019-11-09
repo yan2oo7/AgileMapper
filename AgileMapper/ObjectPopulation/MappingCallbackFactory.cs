@@ -33,8 +33,8 @@
         public Expression Create(IMemberMapperData mapperData)
         {
             mapperData.Context.UsesMappingDataObjectAsParameter =
-                _callbackLambda.UsesMappingDataObjectParameter ||
-                ConfigInfo.ConditionUsesMappingDataObjectParameter;
+                _callbackLambda.HasMappingDataObjectParameter ||
+                 ConfigInfo.ConditionUsesMappingDataObjectParameter;
 
             var callback = _callbackLambda.GetBody(mapperData, CallbackPosition, TargetMember);
             var condition = GetConditionOrNull(mapperData, CallbackPosition);

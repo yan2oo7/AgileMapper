@@ -237,18 +237,18 @@ namespace AgileObjects.AgileMapper.Configuration
             int numberOfParameters,
             Func<Type[], Type[], bool> applicabilityPredicate,
             Func<SwapArgs, Expression> parametersSwapper,
-            bool hasMappingContextParameter = false)
+            bool isMappingContextParameterSignature = false)
         {
             _numberOfParameters = numberOfParameters;
             _applicabilityPredicate = applicabilityPredicate;
             _parametersSwapper = parametersSwapper;
-            HasMappingContextParameter = hasMappingContextParameter;
+            IsMappingContextParameterSignature = isMappingContextParameterSignature;
         }
 
         public static ParametersSwapper For(Type[] contextTypes, Type[] funcArguments)
             => _implementations.FirstOrDefault(pso => pso.AppliesTo(contextTypes, funcArguments));
 
-        public bool HasMappingContextParameter { get; }
+        public bool IsMappingContextParameterSignature { get; }
 
         public bool AppliesTo(Type[] contextTypes, Type[] funcArguments)
             => (funcArguments.Length == _numberOfParameters) && _applicabilityPredicate.Invoke(contextTypes, funcArguments);

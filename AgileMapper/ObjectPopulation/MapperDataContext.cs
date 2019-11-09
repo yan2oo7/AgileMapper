@@ -10,7 +10,7 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
     {
         private readonly ObjectMapperData _mapperData;
         private bool _usesMappingDataObjectAsParameter;
-        private bool? _isMappingDataObjectNeeded;
+        private bool? _needsMappingDataObject;
 
         public MapperDataContext(IMemberMapperData childMapperData)
             : this(
@@ -135,14 +135,14 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
             }
         }
 
-        public bool UsesMappingDataObject
+        public bool NeedsMappingDataObject
         {
             get
             {
-                return (_isMappingDataObjectNeeded ??
-                       (_isMappingDataObjectNeeded =
+                return (_needsMappingDataObject ??
+                       (_needsMappingDataObject =
                            NeedsRuntimeTypedMapping || UsesMappingDataObjectAsParameter ||
-                          _mapperData.ChildMapperDatas.Any(cmd => cmd.Context.UsesMappingDataObject))).Value;
+                          _mapperData.ChildMapperDatas.Any(cmd => cmd.Context.NeedsMappingDataObject))).Value;
             }
         }
 
