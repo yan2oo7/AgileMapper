@@ -25,30 +25,31 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
         {
             _mapperKey = mappingData.MapperKey;
             Mapping = mapping;
-            MapperData = mappingData.MapperData;
+            var mapperData = MapperData = mappingData.MapperData;
+            var mapperDataContext = mapperData.Context;
 
-            if (MapperData.Context.Compile)
+            if (mapperDataContext.IsStandalone && !mapperDataContext.IsForDerivedType)
             {
                 var mappingLambda = Expression.Lambda<MapperFunc<TSource, TTarget>>(
                     mapping,
-                    MapperData.MappingDataObject);
+                    mapperData.MappingDataObject);
 
                 _mapperFunc = mappingLambda.Compile();
             }
-            else if (MapperData.Context.NeedsRuntimeTypedMapping)
+            else if (mapperDataContext.NeedsRuntimeTypedMapping)
             {
-                MapperData.Mapper = this;
+                mapperData.Mapper = this;
             }
 
-            if (MapperData.Context.NeedsRuntimeTypedMapping)
+            if (mapperDataContext.NeedsRuntimeTypedMapping)
             {
-                _subMappersByKey = MapperData.MapperContext.Cache.CreateNew<ObjectMapperKeyBase, IObjectMapper>();
+                _subMappersByKey = mapperData.MapperContext.Cache.CreateNew<ObjectMapperKeyBase, IObjectMapper>();
             }
 
-            if (MapperData.HasRepeatedMapperFuncs)
+            if (mapperData.HasRepeatedMapperFuncs)
             {
-                _repeatedMappingFuncsByKey = MapperData.MapperContext.Cache.CreateNew<ObjectMapperKeyBase, IRepeatedMapperFunc>();
-                MapperData.Mapper = this;
+                _repeatedMappingFuncsByKey = mapperData.MapperContext.Cache.CreateNew<ObjectMapperKeyBase, IRepeatedMapperFunc>();
+                mapperData.Mapper = this;
 
                 CacheRepeatedMappingFuncs();
             }

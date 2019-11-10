@@ -126,8 +126,8 @@ namespace AgileObjects.AgileMapper.ObjectPopulation.ComplexTypes
         private static bool IncludeObjectRegistration(ObjectMapperData mapperData)
         {
             return mapperData.CacheMappedObjects &&
-                   mapperData.RuleSet.Settings.AllowObjectTracking &&
-                  !mapperData.TargetTypeWillNotBeMappedAgain;
+                   mapperData.TargetTypeWillBeMappedAgain &&
+                   mapperData.RuleSet.Settings.AllowObjectTracking;
         }
 
         private static Expression GetObjectRegistrationCall(ObjectMapperData mapperData)

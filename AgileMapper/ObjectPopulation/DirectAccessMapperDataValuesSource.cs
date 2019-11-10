@@ -29,7 +29,7 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
             _originalMapperData = originalMapperData;
             _enumerablePopulationBuilder = enumerablePopulationBuilder;
             Source = mapperData.SourceMember.GetQualifiedAccess(mapperData.Parent.SourceObject);
-            Target = mapperData.TargetMember.GetQualifiedAccess(mapperData.Parent.TargetObject);
+            Target = mapperData.TargetMember.GetQualifiedAccess(mapperData.Parent.TargetInstance);
             RootObjects = new[] { Source, Target };
         }
 

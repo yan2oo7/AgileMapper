@@ -433,7 +433,7 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
 
         public bool TargetTypeHasNotYetBeenMapped { get; }
 
-        private bool TargetTypeWillBeMappedAgain => !TargetTypeWillNotBeMappedAgain;
+        public bool TargetTypeWillBeMappedAgain => !TargetTypeWillNotBeMappedAgain;
 
         public bool TargetTypeWillNotBeMappedAgain { get; }
 
