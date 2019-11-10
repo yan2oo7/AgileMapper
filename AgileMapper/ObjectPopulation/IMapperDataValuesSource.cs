@@ -1,5 +1,6 @@
 namespace AgileObjects.AgileMapper.ObjectPopulation
 {
+    using System.Collections.Generic;
 #if NET35
     using Microsoft.Scripting.Ast;
 #else
@@ -23,5 +24,7 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
         Expression CreatedObject { get; }
 
         Expression EnumerableIndex { get; }
+
+        IList<Expression> RootObjects { get; }
     }
 }

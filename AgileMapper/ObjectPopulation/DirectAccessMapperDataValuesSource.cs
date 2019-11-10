@@ -1,5 +1,6 @@
 namespace AgileObjects.AgileMapper.ObjectPopulation
 {
+    using System.Collections.Generic;
 #if NET35
     using Microsoft.Scripting.Ast;
 #else
@@ -12,7 +13,7 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
     internal class DirectAccessMapperDataValuesSource : IMapperDataValuesSource
     {
         private readonly IMemberMapperData _mapperData;
-        private readonly IMemberMapperData _declaredTypeMapperData;
+        private readonly IMemberMapperData _originalMapperData;
         private readonly EnumerablePopulationBuilder _enumerablePopulationBuilder;
         private Expression _targetInstance;
         private ParameterExpression _localVariable;
@@ -21,14 +22,15 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
 
         public DirectAccessMapperDataValuesSource(
             IMemberMapperData mapperData,
-            IMemberMapperData declaredTypeMapperData,
+            IMemberMapperData originalMapperData,
             EnumerablePopulationBuilder enumerablePopulationBuilder)
         {
             _mapperData = mapperData;
-            _declaredTypeMapperData = declaredTypeMapperData;
+            _originalMapperData = originalMapperData;
             _enumerablePopulationBuilder = enumerablePopulationBuilder;
             Source = mapperData.SourceMember.GetQualifiedAccess(mapperData.Parent.SourceObject);
             Target = mapperData.TargetMember.GetQualifiedAccess(mapperData.Parent.TargetObject);
+            RootObjects = new[] { Source, Target };
         }
 
         public ParameterExpression MappingDataObject => null;
@@ -56,7 +58,7 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
 
         private ParameterExpression CreateLocalVariable()
         {
-            return _enumerablePopulationBuilder?.TargetVariable ?? 
+            return _enumerablePopulationBuilder?.TargetVariable ??
                    Expression.Variable(Target.Type, Target.Type.GetVariableNameInCamelCase());
         }
 
@@ -66,9 +68,11 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
         public Expression EnumerableIndex
             => _enumerableIndex ?? (_enumerableIndex = GetEnumerableIndex());
 
+        public IList<Expression> RootObjects { get; }
+
         private Expression GetEnumerableIndex()
         {
-            return _declaredTypeMapperData?.EnumerableIndex ??
+            return _originalMapperData?.EnumerableIndex ??
                    _enumerablePopulationBuilder?.Counter ??
                    (Expression)default(int?).ToConstantExpression();
         }

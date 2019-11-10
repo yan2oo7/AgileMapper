@@ -1,6 +1,7 @@
 namespace AgileObjects.AgileMapper.ObjectPopulation
 {
     using System;
+    using System.Collections.Generic;
     using System.Globalization;
 #if NET35
     using Microsoft.Scripting.Ast;
@@ -25,6 +26,7 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
         {
             _mapperData = entryPointMapperData;
             MappingDataObject = CreateMappingDataObject();
+            RootObjects = new Expression[] { MappingDataObject };
             _mappingDataType = typeof(IMappingData<,>).MakeGenericType(SourceType, TargetType);
             Source = GetMappingDataProperty(Member.RootSourceMemberName);
             Target = GetMappingDataObjectProperty(Member.RootTargetMemberName);
@@ -102,7 +104,7 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
 
         private ParameterExpression CreateLocalVariable()
         {
-            return _mapperData.EnumerablePopulationBuilder?.TargetVariable ?? 
+            return _mapperData.EnumerablePopulationBuilder?.TargetVariable ??
                    Expression.Variable(TargetType, TargetType.GetVariableNameInCamelCase());
         }
 
@@ -111,6 +113,8 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
 
         public Expression EnumerableIndex
             => _enumerableIndex ?? (_enumerableIndex = GetEnumerableIndex());
+
+        public IList<Expression> RootObjects { get; }
 
         private Expression GetEnumerableIndex()
         {

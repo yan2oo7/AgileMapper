@@ -22,15 +22,15 @@ namespace AgileObjects.AgileMapper.Members
             new ExpressionInfo(null, Enumerable<Expression>.EmptyArray);
 
         public static ExpressionInfoFinder Default =>
-            _default ?? (_default = new ExpressionInfoFinder(mappingDataObject: null));
+            _default ?? (_default = new ExpressionInfoFinder(rootObjects: Enumerable<Expression>.EmptyArray));
 
         private static ExpressionInfoFinder _default;
 
-        private readonly Expression _mappingDataObject;
+        private readonly IList<Expression> _rootObjects;
 
-        public ExpressionInfoFinder(Expression mappingDataObject)
+        public ExpressionInfoFinder(IList<Expression> rootObjects)
         {
-            _mappingDataObject = mappingDataObject;
+            _rootObjects = rootObjects;
         }
 
         public ExpressionInfo FindIn(
@@ -40,7 +40,7 @@ namespace AgileObjects.AgileMapper.Members
             bool invertNestedAccessChecks = false)
         {
             var finder = new ExpressionInfoFinderInstance(
-                _mappingDataObject,
+                _rootObjects,
                 targetCanBeNull,
                 checkMultiInvocations,
                 invertNestedAccessChecks);
@@ -52,7 +52,7 @@ namespace AgileObjects.AgileMapper.Members
 
         private class ExpressionInfoFinderInstance : ExpressionVisitor
         {
-            private readonly Expression _mappingDataObject;
+            private readonly IList<Expression> _rootObjects;
             private readonly bool _includeTargetNullChecking;
             private readonly bool _checkMultiInvocations;
             private readonly bool _invertNestedAccessChecks;
@@ -63,12 +63,12 @@ namespace AgileObjects.AgileMapper.Members
             private ICollection<Expression> _multiInvocations;
 
             public ExpressionInfoFinderInstance(
-                Expression mappingDataObject,
+                IList<Expression> rootObjects,
                 bool targetCanBeNull,
                 bool checkMultiInvocations,
                 bool invertNestedAccessChecks)
             {
-                _mappingDataObject = mappingDataObject;
+                _rootObjects = rootObjects;
                 _includeTargetNullChecking = targetCanBeNull;
                 _checkMultiInvocations = checkMultiInvocations;
                 _invertNestedAccessChecks = invertNestedAccessChecks;
@@ -249,30 +249,26 @@ namespace AgileObjects.AgileMapper.Members
 
             private bool IsRootObject(MemberExpression memberAccess)
             {
-                if (memberAccess.Member.Name == nameof(IMappingData.Parent))
-                {
-                    // ReSharper disable once PossibleNullReferenceException
-                    return memberAccess.Member.DeclaringType.Name
-                        .StartsWith(nameof(IMappingData), StringComparison.Ordinal);
-                }
-
-                if (memberAccess.Expression != _mappingDataObject)
-                {
-                    return false;
-                }
-
                 switch (memberAccess.Member.Name)
                 {
-                    case nameof(IMappingData<int, int>.EnumerableIndex):
+                    case nameof(IMappingData.Parent):
                     case RootSourceMemberName:
-                        return true;
+                    case nameof(IMappingData<int, int>.EnumerableIndex):
+                        return IsMappingDataMember(memberAccess);
 
                     case RootTargetMemberName:
-                        return _includeTargetNullChecking;
+                        return _includeTargetNullChecking && IsMappingDataMember(memberAccess);
 
                     default:
-                        return false;
+                        return _rootObjects.Contains(memberAccess.Expression);
                 }
+            }
+
+            private static bool IsMappingDataMember(MemberExpression memberAccess)
+            {
+                // ReSharper disable once PossibleNullReferenceException
+                return memberAccess.Member.DeclaringType.Name
+                    .StartsWith(nameof(IMappingData), StringComparison.Ordinal);
             }
 
             protected override Expression VisitIndex(IndexExpression indexAccess)
@@ -311,8 +307,8 @@ namespace AgileObjects.AgileMapper.Members
 
             protected override Expression VisitMethodCall(MethodCallExpression methodCall)
             {
-                if ((methodCall.Object == _mappingDataObject) ||
-                    (methodCall.Method.DeclaringType == typeof(IMappingData)))
+                if ((methodCall.Method.DeclaringType == typeof(IMappingData)) ||
+                    _rootObjects.Contains(methodCall.Object))
                 {
                     return base.VisitMethodCall(methodCall);
                 }
@@ -418,7 +414,7 @@ namespace AgileObjects.AgileMapper.Members
                 }
 
                 if (memberAccess.Type.CannotBeNull() ||
-                 ((_mappingDataObject != null) && !memberAccess.IsRootedIn(_mappingDataObject)))
+                  (_rootObjects?.Any(memberAccess, (ma, ro) => ma.IsRootedIn(ro)) == false))
                 {
                     return false;
                 }

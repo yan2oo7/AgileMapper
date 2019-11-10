@@ -91,7 +91,7 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
             {
                 _values = new DirectAccessMapperDataValuesSource(
                     this, 
-                    declaredTypeMapperData,
+                    OriginalMapperData,
                     EnumerablePopulationBuilder);
                 
                 TargetTypeHasNotYetBeenMapped = IsTargetTypeFirstMapping(parent);
@@ -438,14 +438,7 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
         public bool TargetTypeWillNotBeMappedAgain { get; }
 
         public ExpressionInfoFinder ExpressionInfoFinder
-            => _expressionInfoFinder ?? (_expressionInfoFinder = GetExpressionInfoFinder());
-
-        private ExpressionInfoFinder GetExpressionInfoFinder()
-        {
-            return new ExpressionInfoFinder(Context.IsForToTargetMapping
-                ? OriginalMapperData.MappingDataObject
-                : MappingDataObject);
-        }
+            => _expressionInfoFinder ?? (_expressionInfoFinder = new ExpressionInfoFinder(_values.RootObjects));
 
         public EnumerablePopulationBuilder EnumerablePopulationBuilder { get; }
 
