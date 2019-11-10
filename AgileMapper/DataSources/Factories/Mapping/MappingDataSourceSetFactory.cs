@@ -17,7 +17,7 @@
         public static IDataSourceSet CreateFor(IObjectMappingData mappingData)
         {
             var dataSourceFactory = _mappingDataSourceFactories
-                .First(mappingData, (md, mef) => mef.IsFor(md));
+                .First(mappingData, (md, dsf) => dsf.IsFor(md));
 
             var dataSource = dataSourceFactory.CreateFor(mappingData);
 

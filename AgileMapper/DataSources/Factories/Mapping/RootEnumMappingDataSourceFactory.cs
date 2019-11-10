@@ -12,6 +12,6 @@
         }
 
         public override bool IsFor(IObjectMappingData mappingData)
-            => mappingData.MapperData.TargetType.GetNonNullableType().IsEnum();
+            => mappingData.IsRoot && mappingData.MapperData.TargetType.GetNonNullableType().IsEnum();
     }
 }

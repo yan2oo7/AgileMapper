@@ -67,10 +67,13 @@ namespace AgileObjects.AgileMapper.ObjectPopulation.RepeatedMappings
             mappingData.MapperKey.MappingData = mappingData;
             mappingData.MapperKey.MapperData = mappingData.MapperData;
 
-            Mapping = mappingData.GetOrCreateMapper().Mapping;
+            var mappingLambda = Expression.Lambda<MapperFunc<TChildSource, TChildTarget>>(
+                mappingData.GetOrCreateMapper().Mapping,
+                mappingData.MapperData.MappingDataObject);
 
-            var typedMappingLambda = (Expression<MapperFunc<TChildSource, TChildTarget>>)Mapping;
-            _repeatedMappingFunc = typedMappingLambda.Compile();
+            Mapping = mappingLambda;
+
+            _repeatedMappingFunc = mappingLambda.Compile();
 
             if (isLazyLoading)
             {

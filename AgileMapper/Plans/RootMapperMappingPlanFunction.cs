@@ -41,9 +41,9 @@
 
         private Expression GetFinalMappingExpression()
         {
-            var lambdaWithEnumMismatches = EnumMappingMismatchFinder.Process(_mapping, _mapperData);
+            var mappingWithEnumMismatches = EnumMappingMismatchFinder.Process(_mapping, _mapperData);
 
-            return lambdaWithEnumMismatches;
+            return mappingWithEnumMismatches;
         }
     }
 }
