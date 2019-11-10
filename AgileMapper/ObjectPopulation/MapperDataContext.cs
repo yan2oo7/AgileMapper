@@ -15,13 +15,13 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
         public MapperDataContext(IMemberMapperData childMapperData)
             : this(
                 childMapperData.Parent,
-                IsForStandaloneMapping(childMapperData),
+                RuntimeTypesNeeded(childMapperData),
                 childMapperData.Parent.Context.IsForDerivedType,
                 childMapperData)
         {
         }
 
-        private static bool IsForStandaloneMapping(ITypePair mapperData)
+        private static bool RuntimeTypesNeeded(ITypePair mapperData)
             => mapperData.SourceType.RuntimeTypeNeeded() || mapperData.TargetType.RuntimeTypeNeeded();
 
         public MapperDataContext(ObjectMapperData mapperData, bool isStandalone, bool isForDerivedType)

@@ -19,7 +19,7 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
     using NetStandardPolyfills;
     using ReadableExpressions.Extensions;
 
-    internal class ObjectMapperData : MemberMapperDataBase, IMemberMapperData
+    internal class ObjectMapperData : BasicMapperData, IMemberMapperData
     {
         private static readonly MethodInfo _mapRepeatedChildMethod =
             typeof(IObjectMappingDataUntyped).GetPublicInstanceMethod("MapRepeated", parameterCount: 5);
@@ -27,10 +27,10 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
         private static readonly MethodInfo _mapRepeatedElementMethod =
             typeof(IObjectMappingDataUntyped).GetPublicInstanceMethod("MapRepeated", parameterCount: 3);
 
+        private readonly IMapperDataValuesSource _values;
+
         private ExpressionInfoFinder _expressionInfoFinder;
         private ObjectMapperData _entryPointMapperData;
-        private Expression _targetInstance;
-        private ParameterExpression _instanceVariable;
         private MappedObjectCachingMode _mappedObjectCachingMode;
         private bool? _isRepeatMapping;
         private bool _isEntryPoint;
@@ -45,28 +45,21 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
             bool isForStandaloneMapping)
             : base(
                 mappingContext.RuleSet,
+                sourceMember.Type,
+                targetMember.Type,
                 sourceMember,
                 targetMember,
-                mappingContext.MapperContext,
                 parent)
         {
+            MapperContext = mappingContext.MapperContext;
             ChildMapperDatas = new List<ObjectMapperData>();
             DataSourceIndex = dataSourceIndex.GetValueOrDefault();
-
-            CreatedObject = GetMappingDataProperty(nameof(CreatedObject));
 
             var isPartOfDerivedTypeMapping = declaredTypeMapperData != null;
 
             if (isPartOfDerivedTypeMapping)
             {
                 DeclaredTypeMapperData = OriginalMapperData = declaredTypeMapperData;
-                EnumerableIndex = declaredTypeMapperData.EnumerableIndex;
-                ParentObject = declaredTypeMapperData.ParentObject;
-            }
-            else
-            {
-                EnumerableIndex = GetEnumerableIndexAccess();
-                ParentObject = GetParentObjectAccess();
             }
 
             DataSourcesByTargetMember = new Dictionary<QualifiedMember, IDataSourceSet>();
@@ -81,12 +74,14 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
 
             if (IsRoot)
             {
+                _values = new EntryPointMapperDataValuesSource(this);
                 TargetTypeHasNotYetBeenMapped = true;
                 TargetTypeWillNotBeMappedAgain = IsTargetTypeLastMapping(parent);
                 Context = new MapperDataContext(this, true, isPartOfDerivedTypeMapping);
                 return;
             }
 
+            Parent = parent;
             parent.ChildMapperDatas.Add(this);
 
             if (!this.TargetMemberIsEnumerableElement())
@@ -94,6 +89,8 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
                 TargetTypeHasNotYetBeenMapped = IsTargetTypeFirstMapping(parent);
                 TargetTypeWillNotBeMappedAgain = IsTargetTypeLastMapping(parent);
             }
+
+            _values = new EntryPointMapperDataValuesSource(this);
 
             Context = new MapperDataContext(
                 this,
@@ -337,6 +334,10 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
 
         public IObjectMapper Mapper { get; set; }
 
+        public MapperContext MapperContext { get; }
+
+        public ObjectMapperData Parent { get; }
+
         public ObjectMapperData DeclaredTypeMapperData { get; }
 
         public ObjectMapperData OriginalMapperData { get; set; }
@@ -365,10 +366,37 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
             return targetMember;
         }
 
-        public QualifiedMember GetTargetMemberFor(string targetMemberRegistrationName)
-            => TargetMember.GetChildMember(targetMemberRegistrationName);
+        public ParameterExpression MappingDataObject => _values.MappingDataObject;
 
-        public Expression ParentObject { get; }
+        public Expression ParentObject => _values.Parent;
+
+        public Expression SourceObject
+        {
+            get => _values.Source;
+            set => _values.Source = value;
+        }
+
+        public Expression TargetObject
+        {
+            get => _values.Target;
+            set => _values.Target = value;
+        }
+
+        public Expression CreatedObject => _values.CreatedObject;
+
+        public Expression EnumerableIndex => _values.EnumerableIndex;
+
+        public Expression TargetInstance
+        {
+            get => _values.TargetInstance;
+            set => _values.TargetInstance = value;
+        }
+
+        public ParameterExpression LocalVariable
+        {
+            get => _values.LocalVariable;
+            set => _values.LocalVariable = value;
+        }
 
         public bool CacheMappedObjects
         {
@@ -403,29 +431,6 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
 
         public bool TargetTypeWillNotBeMappedAgain { get; }
 
-        public Expression EnumerableIndex { get; }
-
-        public Expression TargetInstance
-        {
-            get => _targetInstance ?? (_targetInstance = GetTargetInstance());
-            set => _targetInstance = value;
-        }
-
-        private Expression GetTargetInstance()
-            => Context.UseLocalVariable ? LocalVariable : TargetObject;
-
-        public ParameterExpression LocalVariable
-        {
-            get => _instanceVariable ?? (_instanceVariable = CreateInstanceVariable());
-            set => _instanceVariable = value;
-        }
-
-        private ParameterExpression CreateInstanceVariable()
-        {
-            return EnumerablePopulationBuilder?.TargetVariable
-                ?? Expression.Variable(TargetType, TargetType.GetVariableNameInCamelCase());
-        }
-
         public ExpressionInfoFinder ExpressionInfoFinder
             => _expressionInfoFinder ?? (_expressionInfoFinder = GetExpressionInfoFinder());
 
@@ -437,8 +442,6 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
         }
 
         public EnumerablePopulationBuilder EnumerablePopulationBuilder { get; }
-
-        public Expression CreatedObject { get; }
 
         public LabelTarget ReturnLabelTarget { get; }
 
