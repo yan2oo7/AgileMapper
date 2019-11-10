@@ -1,12 +1,12 @@
-﻿namespace AgileObjects.AgileMapper.DataSources.Factories.MappingRoot
+﻿namespace AgileObjects.AgileMapper.DataSources.Factories.Mapping
 {
     using NetStandardPolyfills;
     using ObjectPopulation;
     using ReadableExpressions.Extensions;
 
-    internal class EnumMappingRootDataSourceFactory : MappingRootDataSourceFactoryBase
+    internal class RootEnumMappingDataSourceFactory : MappingDataSourceFactoryBase
     {
-        public EnumMappingRootDataSourceFactory()
+        public RootEnumMappingDataSourceFactory()
             : base(new EnumMappingExpressionFactory())
         {
         }

@@ -84,13 +84,19 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
             Parent = parent;
             parent.ChildMapperDatas.Add(this);
 
-            if (!this.TargetMemberIsEnumerableElement())
+            if (this.TargetMemberIsEnumerableElement())
             {
+            }
+            else
+            {
+                _values = new DirectAccessMapperDataValuesSource(
+                    this, 
+                    declaredTypeMapperData,
+                    EnumerablePopulationBuilder);
+                
                 TargetTypeHasNotYetBeenMapped = IsTargetTypeFirstMapping(parent);
                 TargetTypeWillNotBeMappedAgain = IsTargetTypeLastMapping(parent);
             }
-
-            _values = new EntryPointMapperDataValuesSource(this);
 
             Context = new MapperDataContext(
                 this,

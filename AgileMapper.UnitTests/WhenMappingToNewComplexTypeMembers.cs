@@ -17,19 +17,18 @@
         [Fact]
         public void ShouldMapAMemberProperty()
         {
-            var source = new Person
+            var source = new PublicField<PublicProperty<string>>()
             {
-                Address = new Address
+                Value = new PublicProperty<string>
                 {
-                    Line1 = "Over here!"
+                    Value = "Over here!"
                 }
             };
 
-            var result = Mapper.Map(source).ToANew<Person>();
+            var result = Mapper.Map(source).ToANew<PublicProperty<PublicField<string>>>();
 
-            result.Address.ShouldNotBeNull();
-            result.Address.ShouldNotBe(source.Address);
-            result.Address.Line1.ShouldBe("Over here!");
+            result.Value.ShouldNotBeNull();
+            result.Value.Value.ShouldBe("Over here!");
         }
 
         [Fact]
@@ -80,24 +79,6 @@
 
             result.ShouldNotBeNull();
             result.Value.ShouldBeNull();
-        }
-
-        [Fact]
-        public void ShouldApplyAConfiguredExpression()
-        {
-            using (var mapper = Mapper.CreateNew())
-            {
-                mapper.WhenMapping
-                    .From<PersonViewModel>()
-                    .ToANew<Person>()
-                    .Map(ctx => ctx.Source.Name + ", " + ctx.Source.AddressLine1)
-                    .To(x => x.Address.Line1);
-
-                var source = new PersonViewModel { Name = "Fred", AddressLine1 = "Lala Land" };
-                var result = mapper.Map(source).ToANew<Person>();
-
-                result.Address.Line1.ShouldBe("Fred, Lala Land");
-            }
         }
 
         [Fact]

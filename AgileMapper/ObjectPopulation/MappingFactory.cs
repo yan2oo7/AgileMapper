@@ -195,12 +195,12 @@
                 return UseLocalValueVariable(
                     mapperData.MappingDataObject,
                     createMappingDataCall,
-                    mapper.MappingExpression,
+                    mapper.Mapping,
                     mapperData);
             }
 
             return GetDirectAccessMapping(
-                mapper.MappingLambda.Body,
+                mapper.Mapping,
                 mapperData,
                 mappingValues,
                 createMappingDataCall);
@@ -229,16 +229,16 @@
                 sourceValueVariableValue = null;
             }
 
-            var replacementsByTarget = new ExpressionReplacementDictionary(3)
-            {
-                [mapperData.SourceObject] = sourceValue,
-                [mapperData.TargetObject] = mappingValues.TargetValue,
-                [mapperData.EnumerableIndex] = mappingValues.EnumerableIndex.GetConversionTo(mapperData.EnumerableIndex.Type)
-            };
+            //var replacementsByTarget = new ExpressionReplacementDictionary(3)
+            //{
+            //    [mapperData.SourceObject] = sourceValue,
+            //    [mapperData.TargetObject] = mappingValues.TargetValue,
+            //    [mapperData.EnumerableIndex] = mappingValues.EnumerableIndex.GetConversionTo(mapperData.EnumerableIndex.Type)
+            //};
 
-            mapping = mapping
-                .Replace(replacementsByTarget)
-                .Replace(mapperData.MappingDataObject, createMappingDataCall);
+            //mapping = mapping
+            //    .Replace(replacementsByTarget)
+            //    .Replace(mapperData.MappingDataObject, createMappingDataCall);
 
             return useLocalSourceValueVariable
                 ? UseLocalValueVariable(

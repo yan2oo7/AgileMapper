@@ -14,13 +14,13 @@
     {
         private readonly Type _sourceType;
         private readonly Type _targetType;
-        private readonly Expression _mappingLambda;
+        private readonly Expression _mapping;
 
         public RepeatedMappingMappingPlanFunction(IRepeatedMapperFunc mapperFunc)
         {
             _sourceType = mapperFunc.SourceType;
             _targetType = mapperFunc.TargetType;
-            _mappingLambda = mapperFunc.MappingLambda;
+            _mapping = mapperFunc.Mapping;
         }
 
         public string GetDescription()
@@ -33,7 +33,7 @@
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
 
-{_mappingLambda.ToReadableString()}".TrimStart();
+{_mapping.ToReadableString()}".TrimStart();
         }
     }
 }

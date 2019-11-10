@@ -66,13 +66,13 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
 
         public Expression ParentObject { get; }
 
+        public Expression TargetInstance => TargetObject;
+
         public Expression CreatedObject => null;
 
         public Expression EnumerableIndex { get; }
 
         public Expression EnumerableIndexValue { get; }
-
-        public Expression TargetInstance => TargetObject;
 
         public ExpressionInfoFinder ExpressionInfoFinder => Parent.ExpressionInfoFinder;
     }
