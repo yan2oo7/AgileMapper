@@ -162,9 +162,9 @@ namespace AgileObjects.AgileMapper.DataSources
                 var dataSourcesCount = dataSources.Count;
                 var variables = default(List<ParameterExpression>);
 
-                for (var i = 0; ;)
+                for (var i = 0; i < dataSourcesCount; ++i)
                 {
-                    var dataSource = dataSources[i++];
+                    var dataSource = dataSources[i];
 
                     if (dataSource.IsValid)
                     {

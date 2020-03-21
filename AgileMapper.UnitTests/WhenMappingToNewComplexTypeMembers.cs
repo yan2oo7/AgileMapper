@@ -35,11 +35,19 @@
         public void ShouldHandleANullSourceMember()
         {
             var source = new Person { Name = "Freddie" };
-
             var result = Mapper.Map(source).ToANew<Person>();
 
             result.Name.ShouldBe(source.Name);
             result.Address.ShouldBeNull();
+        }
+
+        [Fact]
+        public void ShouldHandleANullSourceGetMethodResult()
+        {
+            var source = new PublicGetMethod<Address>(default);
+            var result = Mapper.Map(source).ToANew<PublicField<Address>>();
+
+            result.ShouldNotBeNull().Value.ShouldBeNull();
         }
 
         [Fact]

@@ -7,10 +7,11 @@ namespace AgileObjects.AgileMapper
         Type SourceType { get; }
 
         Type TargetType { get; }
-    }
 
-    internal interface IChild<out TParent>
-    {
-        TParent Parent { get; }
+        bool IsForSourceType(ITypePair typePair);
+
+        bool IsForTargetType(ITypePair typePair);
+
+        bool HasCompatibleTypes(ITypePair typePair);
     }
 }

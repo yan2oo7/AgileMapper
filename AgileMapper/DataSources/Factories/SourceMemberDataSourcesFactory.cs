@@ -90,7 +90,7 @@
 
         private static bool ReturnSimpleTypeToTargetDataSources(this DataSourceFindContext context)
         {
-            return context.BestSourceMemberMatch.SourceMember.IsSimple &&
+            return context.MatchingSourceMemberDataSource.SourceMember.IsSimple &&
                    context.MapperContext.UserConfigurations.HasToTargetDataSources;
         }
 

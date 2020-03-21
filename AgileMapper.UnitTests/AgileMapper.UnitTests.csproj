@@ -26,7 +26,7 @@
     <DebugType>full</DebugType>
     <Optimize>false</Optimize>
     <OutputPath>bin\Debug\</OutputPath>
-    <DefineConstants>DEBUG;TRACE;NET40</DefineConstants>
+    <DefineConstants>DEBUG;TRACE;NET40;FEATURE_DYNAMIC_ROOT_SOURCE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
     <Prefer32Bit>false</Prefer32Bit>
@@ -35,7 +35,7 @@
     <DebugType>pdbonly</DebugType>
     <Optimize>true</Optimize>
     <OutputPath>bin\Release\</OutputPath>
-    <DefineConstants>TRACE;NET40</DefineConstants>
+    <DefineConstants>TRACE;NET40;FEATURE_DYNAMIC_ROOT_SOURCE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
     <Prefer32Bit>false</Prefer32Bit>
@@ -173,6 +173,7 @@
     <Compile Include="MapperCloning\WhenCloningObjectFactories.cs" />
     <Compile Include="MapperCloning\WhenCloningStringFormatting.cs" />
     <Compile Include="SimpleTypeConversion\WhenConvertingToCharacters.cs" />
+    <Compile Include="SimpleTypeConversion\WhenConvertingToDateTimeOffsets.cs" />
     <Compile Include="SimpleTypeConversion\WhenConvertingToTimeSpans.cs" />
     <Compile Include="SimpleTypeConversion\WhenConvertingToFlagsEnums.cs" />
     <Compile Include="Structs\Configuration\WhenConfiguringStructCreationCallbacks.cs" />

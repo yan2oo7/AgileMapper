@@ -11,71 +11,74 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
     using Members;
     using NetStandardPolyfills;
 
-    internal abstract class MemberMapperDataBase : BasicMapperData
+    internal abstract class MemberMapperDataBase : QualifiedMemberContext
     {
         protected MemberMapperDataBase(
             MappingRuleSet ruleSet,
             IQualifiedMember sourceMember,
             QualifiedMember targetMember,
-            MapperContext mapperContext,
-            ObjectMapperData parent)
+            ObjectMapperData parent,
+            MapperContext mapperContext)
             : base(
                 ruleSet,
                 sourceMember.Type,
                 targetMember.Type,
                 sourceMember,
                 targetMember,
-                parent)
+                parent,
+                mapperContext)
         {
-            MapperContext = mapperContext;
             Parent = parent;
-            MappingDataObject = CreateMappingDataObject();
             MappingDataType = typeof(IMappingData<,>).MakeGenericType(SourceType, TargetType);
             SourceObject = GetMappingDataProperty(MappingDataType, Member.RootSourceMemberName);
             TargetObject = GetMappingDataProperty(Member.RootTargetMemberName);
         }
 
-        public MapperContext MapperContext { get; }
+        protected abstract IMapperDataValuesSource Values { get; }
 
         public ObjectMapperData Parent { get; }
 
-        public ParameterExpression MappingDataObject { get; }
+        public ParameterExpression MappingDataObject => Values.MappingDataObject;
 
-        public Expression SourceObject { get; set; }
+        public Expression ParentObject => Values.Parent;
 
-        public Expression TargetObject { get; set; }
-
-        protected ParameterExpression CreateMappingDataObject()
+        public Expression SourceObject
         {
-            var mdType = typeof(IObjectMappingData<,>).MakeGenericType(SourceType, TargetType);
+            get => Values.Source;
+            set => Values.Source = value;
+        }
 
-            var parent = Parent;
-            var variableNameIndex = default(int?);
+        public Expression TargetObject
+        {
+            get => Values.Target;
+            set => Values.Target = value;
+        }
 
-            while (parent != null)
-            {
-                if (parent.MappingDataObject.Type == mdType)
-                {
-                    variableNameIndex = variableNameIndex.HasValue ? (variableNameIndex + 1) : 2;
-                }
+        public Expression CreatedObject => Values.CreatedObject;
 
-                parent = parent.Parent;
-            }
+        public Expression ElementIndex => Values.ElementIndex;
 
-            var mappingDataVariableName = string.Format(
-                CultureInfo.InvariantCulture,
-                "{0}To{1}Data{2}",
-                SourceType.GetShortVariableName(),
-                TargetType.GetShortVariableName().ToPascalCase(),
-                variableNameIndex);
+        public Expression ElementKey => Values.ElementKey;
 
-            return Expression.Parameter(mdType, mappingDataVariableName);
+        public Expression TargetInstance
+        {
+            get => Values.TargetInstance;
+            set => Values.TargetInstance = value;
+        }
+
+        public ParameterExpression LocalVariable
+        {
+            get => Values.LocalVariable;
+            set => Values.LocalVariable = value;
         }
 
         protected Type MappingDataType { get; }
 
-        protected Expression GetEnumerableIndexAccess()
-            => GetMappingDataProperty(MappingDataType, "EnumerableIndex");
+        protected Expression GetElementIndexAccess()
+            => GetMappingDataProperty(MappingDataType, "ElementIndex");
+
+        protected Expression GetElementKeyAccess()
+            => GetMappingDataProperty(MappingDataType, "ElementKey");
 
         protected Expression GetParentObjectAccess()
             => GetMappingDataProperty(nameof(Parent));

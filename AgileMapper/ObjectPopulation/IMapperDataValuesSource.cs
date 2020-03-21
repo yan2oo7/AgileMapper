@@ -23,7 +23,9 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
 
         Expression CreatedObject { get; }
 
-        Expression EnumerableIndex { get; }
+        Expression ElementIndex { get; }
+
+        Expression ElementKey { get; }
 
         IList<Expression> RootObjects { get; }
     }

@@ -4,17 +4,22 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
     using System.Linq;
 #if NET35
     using Microsoft.Scripting.Ast;
-    using static Microsoft.Scripting.Ast.ExpressionType;
 #else
     using System.Linq.Expressions;
-    using static System.Linq.Expressions.ExpressionType;
 #endif
     using DataSources;
+    using Enumerables.EnumerableExtensions;
     using Extensions;
     using Extensions.Internal;
     using Members;
+    using Members.MemberExtensions;
     using ReadableExpressions;
     using ReadableExpressions.Extensions;
+#if NET35
+    using static Microsoft.Scripting.Ast.ExpressionType;
+#else
+    using static System.Linq.Expressions.ExpressionType;
+#endif
 
     internal abstract class MappingExpressionFactoryBase
     {
@@ -88,9 +93,9 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
                 yield break;
             }
 
-            for (var i = 0; i < configuredToTargetDataSources.Count;)
+            for (var i = 0; i < configuredToTargetDataSources.Count; ++i)
             {
-                var configuredToTargetDataSource = configuredToTargetDataSources[i++];
+                var configuredToTargetDataSource = configuredToTargetDataSources[i];
                 var newSourceContext = context.WithDataSource(configuredToTargetDataSource);
 
                 AddPopulationsAndCallbacks(newSourceContext);
@@ -118,7 +123,7 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
                     continue;
                 }
 
-                if (context.MapperData.TargetMember.IsComplex || (i > 1))
+                if (context.MapperData.TargetMember.IsComplex || (i > 0))
                 {
                     yield return Expression.IfThen(configuredToTargetDataSource.Condition, mapping);
                     continue;

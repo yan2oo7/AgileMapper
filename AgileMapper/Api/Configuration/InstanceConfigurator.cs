@@ -45,7 +45,7 @@ namespace AgileObjects.AgileMapper.Api.Configuration
         /// </param>
         public void IdentifyUsing<TId>(Expression<Func<TObject, TId>> idExpression)
         {
-            _configInfo.MapperContext.UserConfigurations.Identifiers.Add(
+            _configInfo.UserConfigurations.Identifiers.Add(
                 typeof(TObject),
                 idExpression
 #if NET35
@@ -88,9 +88,9 @@ namespace AgileObjects.AgileMapper.Api.Configuration
 
             compositeIdParts.Add(GetIdPartOrThrow(idParts.First().Body));
 
-            for (var i = 1; i < idParts.Length;)
+            for (var i = 1; i < idParts.Length; ++i)
             {
-                var idPart = GetIdPartOrThrow(idParts[i++].ReplaceParameterWith(entityParameter));
+                var idPart = GetIdPartOrThrow(idParts[i].ReplaceParameterWith(entityParameter));
 
                 compositeIdParts.Add(StringExpressionExtensions.Underscore);
                 compositeIdParts.Add(idPart);
@@ -100,7 +100,7 @@ namespace AgileObjects.AgileMapper.Api.Configuration
 
             var compositeIdLambda = Lambda<Func<TObject, string>>(compositeId, entityParameter);
 
-            _configInfo.MapperContext.UserConfigurations.Identifiers.Add(typeof(TObject), compositeIdLambda);
+            _configInfo.UserConfigurations.Identifiers.Add(typeof(TObject), compositeIdLambda);
         }
 
         private Expression GetIdPartOrThrow(Expression idPart)
@@ -145,8 +145,7 @@ namespace AgileObjects.AgileMapper.Api.Configuration
 
             var idPartNestedAccessesChecks = _configInfo
                 .RuleSet
-                .GetExpressionInfoFor(idPart)
-                .NestedAccessChecks;
+                .GetNestedAccessChecksFor(idPart);
 
             if (idPartNestedAccessesChecks == null)
             {

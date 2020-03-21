@@ -8,12 +8,18 @@ namespace AgileObjects.AgileMapper.Configuration
 #else
     using System.Linq.Expressions;
 #endif
+    using Caching.Dictionaries;
     using Extensions;
     using Extensions.Internal;
     using Members;
     using NetStandardPolyfills;
     using ObjectPopulation;
     using static Members.Member;
+#if NET35
+    using static Microsoft.Scripting.Ast.Expression;
+#else
+    using static System.Linq.Expressions.Expression;
+#endif
 
     internal class ParametersSwapper
     {
@@ -104,21 +110,20 @@ namespace AgileObjects.AgileMapper.Configuration
             var memberContextType = IsCallbackContext(contextTypes) ? contextType : contextType.GetAllInterfaces().First();
             var sourceProperty = memberContextType.GetPublicInstanceProperty(RootSourceMemberName);
             var targetProperty = memberContextType.GetPublicInstanceProperty(RootTargetMemberName);
-            var indexProperty = memberContextType.GetPublicInstanceProperty("EnumerableIndex");
+            var indexProperty = memberContextType.GetPublicInstanceProperty("ElementIndex");
             var parentProperty = memberContextType.GetPublicInstanceProperty("Parent");
 
-            var replacementsByTarget = new ExpressionReplacementDictionary(5)
-            {
-                [Expression.Property(contextParameter, sourceProperty)] = contextInfo.SourceAccess,
-                [Expression.Property(contextParameter, targetProperty)] = contextInfo.TargetAccess,
-                [Expression.Property(contextParameter, indexProperty)] = contextInfo.Index,
-                [Expression.Property(contextParameter, parentProperty)] = contextInfo.Parent
-            };
+            var replacementsByTarget = FixedSizeExpressionReplacementDictionary
+                .WithEquivalentKeys(5)
+                .Add(Property(contextParameter, sourceProperty), contextInfo.SourceAccess)
+                .Add(Property(contextParameter, targetProperty), contextInfo.TargetAccess)
+                .Add(Property(contextParameter, indexProperty), contextInfo.Index)
+                .Add(Property(contextParameter, parentProperty), contextInfo.Parent);
 
             if (IsObjectCreationContext(contextTypes))
             {
                 replacementsByTarget.Add(
-                    Expression.Property(contextParameter, "CreatedObject"),
+                    Property(contextParameter, "CreatedObject"),
                     contextInfo.CreatedObject);
             }
 
@@ -136,7 +141,7 @@ namespace AgileObjects.AgileMapper.Configuration
                 return lambda.ReplaceParameterWith(contextInfo.MappingDataAccess);
             }
 
-            var createObjectCreationContextCall = Expression.Call(
+            var createObjectCreationContextCall = Call(
                 ObjectCreationMappingData.CreateMethod.MakeGenericMethod(contextInfo.ContextTypes),
                 contextInfo.MappingDataAccess,
                 contextInfo.CreatedObject);
@@ -170,7 +175,7 @@ namespace AgileObjects.AgileMapper.Configuration
 
         private static MappingContextInfo GetAppropriateMappingContext(SwapArgs swapArgs)
         {
-            if (swapArgs.SourceType.IsSimple())
+            if (UseSimpleTypeMappingContextInfo(swapArgs))
             {
                 return GetSimpleTypesMappingContextInfo(swapArgs);
             }
@@ -183,6 +188,24 @@ namespace AgileObjects.AgileMapper.Configuration
             var contextAccess = swapArgs.GetAppropriateMappingContextAccess();
 
             return new MappingContextInfo(swapArgs, contextAccess);
+        }
+
+        private static bool UseSimpleTypeMappingContextInfo(SwapArgs swapArgs)
+        {
+            if (!swapArgs.ContextSourceType.IsSimple())
+            {
+                return false;
+            }
+
+            if (swapArgs.ContextTargetType == typeof(object))
+            {
+                return false;
+            }
+
+            // Configured simple -> target context; use a parent context
+            // even if the MapperData types match the context types as
+            // the MapperData won't have the correct MappingDataObject:
+            return true;
         }
 
         private static MappingContextInfo GetSimpleTypesMappingContextInfo(SwapArgs swapArgs)
@@ -202,7 +225,7 @@ namespace AgileObjects.AgileMapper.Configuration
                     break;
                 }
 
-                if (!contextMapperData.IsRoot)
+                if (!contextMapperData.IsEntryPoint)
                 {
                     contextMapperData = contextMapperData.Parent;
                     continue;
@@ -302,8 +325,8 @@ namespace AgileObjects.AgileMapper.Configuration
                 : this(
                     swapArgs,
                     contextAccess,
-                    GetValueAccess(swapArgs.GetSourceAccess(contextAccess), swapArgs.SourceType),
-                    GetValueAccess(swapArgs.GetTargetAccess(contextAccess), swapArgs.TargetType))
+                    GetValueAccess(swapArgs.GetSourceAccess(contextAccess), swapArgs.ContextSourceType),
+                    GetValueAccess(swapArgs.GetTargetAccess(contextAccess), swapArgs.ContextTargetType))
             {
             }
 
@@ -351,13 +374,15 @@ namespace AgileObjects.AgileMapper.Configuration
 
             public Expression TargetAccess { get; }
 
-            public Expression Index => _swapArgs.MapperData.EnumerableIndex;
+            public Expression Index => _swapArgs.MapperData.ElementIndex;
 
             public Expression Parent => _swapArgs.MapperData.ParentObject;
         }
 
         public class SwapArgs
         {
+            private readonly Func<IMemberMapperData, Expression, Type, Expression> _targetValueFactory;
+
             public SwapArgs(
                 LambdaExpression lambda,
                 Type[] contextTypes,
@@ -367,37 +392,32 @@ namespace AgileObjects.AgileMapper.Configuration
                 Lambda = lambda;
                 ContextTypes = (contextTypes.Length > 1) ? contextTypes : contextTypes.Append(typeof(object));
                 MapperData = mapperData;
-                TargetValueFactory = targetValueFactory;
+                _targetValueFactory = targetValueFactory;
             }
 
             public LambdaExpression Lambda { get; }
 
             public Type[] ContextTypes { get; }
 
-            public Type SourceType => ContextTypes[0];
-            
-            public Type TargetType => ContextTypes[1];
+            public Type ContextSourceType => ContextTypes[0];
+
+            public Type ContextTargetType => ContextTypes[1];
 
             public IMemberMapperData MapperData { get; }
-
-            public Func<IMemberMapperData, Expression, Type, Expression> TargetValueFactory { get; }
 
             public bool ContextTypesMatch() => MapperData.TypesMatch(ContextTypes);
 
             public Expression GetAppropriateMappingContextAccess()
-                => GetAppropriateMappingContextAccess(ContextTypes);
-
-            public Expression GetAppropriateMappingContextAccess(params Type[] contextTypes)
-                => MapperData.GetAppropriateMappingContextAccess(contextTypes);
+                => MapperData.GetAppropriateMappingContextAccess(ContextTypes);
 
             public Expression GetTypedContextAccess(Expression contextAccess)
                 => MapperData.GetTypedContextAccess(contextAccess, ContextTypes);
 
             public Expression GetSourceAccess(Expression contextAccess)
-                => MapperData.GetSourceAccess(contextAccess, SourceType);
+                => MapperData.GetSourceAccess(contextAccess, ContextSourceType);
 
             public Expression GetTargetAccess(Expression contextAccess)
-                => TargetValueFactory.Invoke(MapperData, contextAccess, TargetType);
+                => _targetValueFactory.Invoke(MapperData, contextAccess, ContextTargetType);
         }
 
         #endregion

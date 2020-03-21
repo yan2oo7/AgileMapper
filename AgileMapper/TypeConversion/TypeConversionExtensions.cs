@@ -8,9 +8,11 @@
 #else
     using System.Linq.Expressions;
 #endif
+    using Caching.Dictionaries;
     using Extensions;
     using Extensions.Internal;
     using Members;
+    using Members.MemberExtensions;
     using ObjectPopulation;
     using ReadableExpressions.Extensions;
 
@@ -48,11 +50,11 @@
         public static Expression GetValueConversion(this IMemberMapperData mapperData, Expression value, Type targetType)
             => mapperData.MapperContext.GetValueConversion(value, targetType);
 
-        private static bool HasConfiguredSimpleTypeValueFactories(this IMemberMapperData mapperData)
-            => mapperData.MapperContext.UserConfigurations.HasSimpleTypeValueFactories;
+        private static bool HasConfiguredSimpleTypeValueFactories(this IMapperContextOwner mapperContextOwner)
+            => mapperContextOwner.MapperContext.UserConfigurations.HasSimpleTypeValueFactories;
 
         private static IEnumerable<ConfiguredObjectFactory> QuerySimpleTypeValueFactories(
-            this IMemberMapperData mapperData,
+            this IQualifiedMemberContext context,
             Type sourceType,
             Type targetType)
         {
@@ -61,13 +63,15 @@
                 return Enumerable<ConfiguredObjectFactory>.Empty;
             }
 
-            var queryMapperData = new BasicMapperData(
-                mapperData.RuleSet,
+            var queryMapperData = new QualifiedMemberContext(
+                context.RuleSet,
                 sourceType,
                 targetType.GetNonNullableType(),
-                QualifiedMember.All);
+                QualifiedMember.All,
+                context.Parent,
+                context.MapperContext);
 
-            return mapperData
+            return context
                 .MapperContext
                 .UserConfigurations
                 .QueryObjectFactories(queryMapperData);
@@ -80,17 +84,16 @@
             IList<ConfiguredObjectFactory> valueFactories)
         {
             var simpleMemberMapperData = SimpleMemberMapperData.Create(value, mapperData);
-            
-            var checkNestedAccesses = 
+
+            var checkNestedAccesses =
                 simpleMemberMapperData.TargetMemberIsEnumerableElement() &&
                 value.Type.CanBeNull();
 
-            var replacements = new ExpressionReplacementDictionary(3)
-            {
-                [simpleMemberMapperData.SourceObject] = value,
-                [simpleMemberMapperData.TargetObject] = mapperData.GetTargetMemberAccess(),
-                [simpleMemberMapperData.EnumerableIndex] = simpleMemberMapperData.EnumerableIndexValue
-            };
+            var replacements = FixedSizeExpressionReplacementDictionary
+                .WithEquivalentKeys(3)
+                .Add(simpleMemberMapperData.SourceObject, value)
+                .Add(simpleMemberMapperData.TargetObject, mapperData.GetTargetMemberAccess())
+                .Add(simpleMemberMapperData.ElementIndex, simpleMemberMapperData.ElementIndexValue);
 
             var conversions = valueFactories.ProjectToArray(vf =>
             {
@@ -99,9 +102,8 @@
 
                 if (checkNestedAccesses)
                 {
-                    var nestedAccessChecks = ExpressionInfoFinder.Default
-                        .FindIn(factoryExpression, checkMultiInvocations: false)
-                        .NestedAccessChecks;
+                    var nestedAccessChecks = NestedAccessChecksFactory
+                        .GetNestedAccessChecksFor(factoryExpression);
 
                     if (nestedAccessChecks != null)
                     {

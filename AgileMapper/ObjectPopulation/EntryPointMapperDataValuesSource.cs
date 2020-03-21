@@ -20,14 +20,15 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
         private Expression _targetInstance;
         private ParameterExpression _localVariable;
         private Expression _createdObject;
-        private Expression _enumerableIndex;
+        private Expression _elementIndex;
+        private Expression _elementKey;
 
         public EntryPointMapperDataValuesSource(ObjectMapperData entryPointMapperData)
         {
             _mapperData = entryPointMapperData;
+            _mappingDataType = typeof(IMappingData<,>).MakeGenericType(SourceType, TargetType);
             MappingDataObject = CreateMappingDataObject();
             RootObjects = new Expression[] { MappingDataObject };
-            _mappingDataType = typeof(IMappingData<,>).MakeGenericType(SourceType, TargetType);
             Source = GetMappingDataProperty(Member.RootSourceMemberName);
             Target = GetMappingDataObjectProperty(Member.RootTargetMemberName);
         }
@@ -111,15 +112,24 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
         public Expression CreatedObject
             => _createdObject ?? (_createdObject = GetMappingDataObjectProperty(nameof(CreatedObject)));
 
-        public Expression EnumerableIndex
-            => _enumerableIndex ?? (_enumerableIndex = GetEnumerableIndex());
+        public Expression ElementIndex
+            => _elementIndex ?? (_elementIndex = GetElementIndexAccess());
+
+        private Expression GetElementIndexAccess()
+        {
+            return _mapperData.DeclaredTypeMapperData?.ElementIndex ??
+                   GetMappingDataProperty(nameof(ElementIndex));
+        }
+
+        public Expression ElementKey
+            => _elementKey ?? (_elementKey = GetElementKeyAccess());
+
+        private Expression GetElementKeyAccess()
+        {
+            return _mapperData.DeclaredTypeMapperData?.ElementKey ??
+                   GetMappingDataProperty(nameof(ElementKey));
+        }
 
         public IList<Expression> RootObjects { get; }
-
-        private Expression GetEnumerableIndex()
-        {
-            return _mapperData.DeclaredTypeMapperData?.EnumerableIndex ??
-                   GetMappingDataProperty(nameof(EnumerableIndex));
-        }
     }
 }

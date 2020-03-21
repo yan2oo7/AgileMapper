@@ -42,9 +42,9 @@
         {
             get
             {
-                for (var i = 0; i < _length;)
+                for (var i = 0; i < _length; ++i)
                 {
-                    yield return _values[i++];
+                    yield return _values[i];
                 }
             }
         }
@@ -172,7 +172,7 @@
             }
         }
 
-        private T[] ResizeToCapacity<T>(T[] existingArray)
+        private T[] ResizeToCapacity<T>(IList<T> existingArray)
         {
             var biggerArray = new T[_capacity];
 

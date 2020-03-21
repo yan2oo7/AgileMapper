@@ -18,8 +18,10 @@
 #endif
     public class WhenConfiguringDataSources
     {
+        private int _returnInstanceCount;
+
         [Fact]
-        public void ShouldApplyAConfiguredConstant()
+        public void ShouldApplyAConstant()
         {
             using (var mapper = Mapper.CreateNew())
             {
@@ -37,7 +39,7 @@
         }
 
         [Fact]
-        public void ShouldApplyAConfiguredConstantFromAllSourceTypes()
+        public void ShouldApplyAConstantFromAllSourceTypes()
         {
             using (var mapper = Mapper.CreateNew())
             {
@@ -57,7 +59,7 @@
         }
 
         [Fact]
-        public void ShouldConditionallyApplyAConfiguredConstant()
+        public void ShouldApplyAConstantConditionally()
         {
             using (var mapper = Mapper.CreateNew())
             {
@@ -82,7 +84,7 @@
         }
 
         [Fact]
-        public void ShouldApplyAConfiguredConstantToANestedMember()
+        public void ShouldApplyAConstantToANestedMember()
         {
             using (var mapper = Mapper.CreateNew())
             {
@@ -103,7 +105,7 @@
         }
 
         [Fact]
-        public void ShouldApplyAConfiguredMember()
+        public void ShouldApplyASourceMember()
         {
             using (var mapper = Mapper.CreateNew())
             {
@@ -121,7 +123,7 @@
         }
 
         [Fact]
-        public void ShouldApplyAConfiguredInterfaceMember()
+        public void ShouldApplyASourceInterfaceMember()
         {
             using (var mapper = Mapper.CreateNew())
             {
@@ -139,7 +141,7 @@
         }
 
         [Fact]
-        public void ShouldApplyAConfiguredInterfaceMemberBetweenInterfaces()
+        public void ShouldApplyAnInterfaceMemberBetweenInterfaces()
         {
             using (var mapper = Mapper.CreateNew())
             {
@@ -151,7 +153,7 @@
 
                 var source = new PublicOtherImplementation<int> { Value = 2 };
                 var target = new PublicImplementation<long> { Value = 2L };
-                
+
                 mapper.Map(source).Over((IPublicInterface)target);
 
                 target.Value.ShouldBe(4L);
@@ -159,7 +161,7 @@
         }
 
         [Fact]
-        public void ShouldApplyMultipleConfiguredMembersBySourceType()
+        public void ShouldApplyMultipleSourceMembersBySourceType()
         {
             using (var mapper = Mapper.CreateNew())
             {
@@ -187,7 +189,7 @@
         }
 
         [Fact]
-        public void ShouldAllowConditionTypeTestsWhenMappingFromAnInterface()
+        public void ShouldAllowConditionTypeTestsIfSourceIsAnInterface()
         {
             using (var mapper = Mapper.CreateNew())
             {
@@ -213,9 +215,27 @@
             }
         }
 
+        [Fact]
+        public void ShouldApplyAConfiguredExpression()
+        {
+            using (var mapper = Mapper.CreateNew())
+            {
+                mapper.WhenMapping
+                    .From<PersonViewModel>()
+                    .ToANew<Person>()
+                    .Map(ctx => ctx.Source.Name + ", " + ctx.Source.AddressLine1)
+                    .To(x => x.Address.Line1);
+
+                var source = new PersonViewModel { Name = "Fred", AddressLine1 = "Lala Land" };
+                var result = mapper.Map(source).ToANew<Person>();
+
+                result.Address.Line1.ShouldBe("Fred, Lala Land");
+            }
+        }
+
         // See https://github.com/agileobjects/AgileMapper/issues/111
         [Fact]
-        public void ShouldConditionallyApplyAToTargetSimpleTypeConstant()
+        public void ShouldApplyAToTargetSimpleTypeConstantConditionally()
         {
             using (var mapper = Mapper.CreateNew())
             {
@@ -233,7 +253,7 @@
         }
 
         [Fact]
-        public void ShouldConditionallyApplyAToTargetSimpleType()
+        public void ShouldApplyAToTargetSimpleTypeExpressionResult()
         {
             using (var mapper = Mapper.CreateNew())
             {
@@ -250,7 +270,7 @@
         }
 
         [Fact]
-        public void ShouldConditionallyApplyAToTargetNestedSimpleTypeExpression()
+        public void ShouldApplyAToTargetSimpleTypeExpressionToANestedMemberConditionally()
         {
             using (var mapper = Mapper.CreateNew())
             {
@@ -274,7 +294,7 @@
         }
 
         [Fact]
-        public void ShouldConditionallyApplyAToTargetSimpleTypeExpressionToAComplexTypeListMember()
+        public void ShouldApplyAToTargetSimpleTypeExpressionToAComplexTypeListMemberConditionally()
         {
             using (var mapper = Mapper.CreateNew())
             {
@@ -300,7 +320,7 @@
         }
 
         [Fact]
-        public void ShouldConditionallyApplyAConfiguredMember()
+        public void ShouldApplyASourceMemberConditionally()
         {
             using (var mapper = Mapper.CreateNew())
             {
@@ -345,7 +365,7 @@
         }
 
         [Fact]
-        public void ShouldConditionallyApplyMultipleConfiguredMembers()
+        public void ShouldApplyMultipleSourceMembersConditionally()
         {
             using (var mapper = Mapper.CreateNew())
             {
@@ -434,6 +454,49 @@
             }
         }
 
+        // See https://github.com/agileobjects/AgileMapper/issues/176
+        [Fact]
+        public void ShouldHandleANullConfiguredStaticFactoryMethodResult()
+        {
+            using (var mapper = Mapper.CreateNew())
+            {
+                mapper.WhenMapping.ThrowIfAnyMappingPlanIsIncomplete();
+
+                mapper.WhenMapping
+                    .From<Address>()
+                    .To<PublicProperty<PublicProperty<string>>>()
+                    .Map((pf, _) => ReturnNull<PublicProperty<string>>())
+                    .To(pp => pp.Value);
+
+                var source = new Address();
+                var result = mapper.Map(source).ToANew<PublicProperty<PublicProperty<string>>>();
+
+                result.ShouldNotBeNull().Value.ShouldBeNull();
+            }
+        }
+
+        // See https://github.com/agileobjects/AgileMapper/issues/176
+        [Fact]
+        public void ShouldCacheAConfiguredInstanceFactoryMethodResult()
+        {
+            using (var mapper = Mapper.CreateNew())
+            {
+                _returnInstanceCount = 0;
+
+                mapper.WhenMapping
+                    .From<Address>()
+                    .To<PublicProperty<PublicProperty<string>>>()
+                    .Map((s, t) => ReturnInstance<PublicProperty<string>>())
+                    .To(pp => pp.Value);
+
+                var source = new Address();
+                var result = mapper.Map(source).ToANew<PublicProperty<PublicProperty<string>>>();
+
+                result.ShouldNotBeNull().Value.ShouldNotBeNull();
+                _returnInstanceCount.ShouldBe(1);
+            }
+        }
+
         [Fact]
         public void ShouldWrapAnExceptionThrownInACondition()
         {
@@ -456,7 +519,7 @@
         }
 
         [Fact]
-        public void ShouldWrapAConfiguredDataSourceException()
+        public void ShouldWrapADataSourceException()
         {
             Should.Throw<MappingException>(() =>
             {
@@ -476,7 +539,7 @@
         }
 
         [Fact]
-        public void ShouldApplyAConfiguredMemberFromAllSourceTypes()
+        public void ShouldApplyASourceExpressionFromAllSourceTypes()
         {
             using (var mapper = Mapper.CreateNew())
             {
@@ -494,7 +557,7 @@
         }
 
         [Fact]
-        public void ShouldApplyAConfiguredMemberInARootEnumerable()
+        public void ShouldApplyASourceMemberInARootEnumerable()
         {
             using (var mapper = Mapper.CreateNew())
             {
@@ -511,7 +574,7 @@
         }
 
         [Fact]
-        public void ShouldApplyAConfiguredMemberFromADerivedSourceType()
+        public void ShouldApplyAParentSourceMemberToADerivedSourceType()
         {
             using (var mapper = Mapper.CreateNew())
             {
@@ -529,7 +592,31 @@
         }
 
         [Fact]
-        public void ShouldApplyAConfiguredExpression()
+        public void ShouldApplyASourceMemberToABaseSourceTypeOnly()
+        {
+            using (var mapper = Mapper.CreateNew())
+            {
+                mapper.WhenMapping
+                    .From<Customer>().ButNotDerivedTypes
+                    .To<CustomerViewModel>()
+                    .Map(c => c.Id, x => x.Name);
+
+                var source = new Customer[]
+                {
+                    new Customer { Id = Guid.NewGuid(), Address = new Address() },
+                    new MysteryCustomer { Id = Guid.NewGuid(), Name = "Whaaaat?!?" },
+                };
+
+                var result = mapper.Map(source).ToANew<IEnumerable<CustomerViewModel>>();
+
+                result.Count().ShouldBe(2);
+                result.First().Name.ShouldBe(source.First().Id.ToString());
+                result.Second().Name.ShouldBe("Whaaaat?!?");
+            }
+        }
+
+        [Fact]
+        public void ShouldApplyAnExpression()
         {
             using (var mapper = Mapper.CreateNew())
             {
@@ -547,28 +634,7 @@
         }
 
         [Fact]
-        public void ShouldWrapAnExceptionThrownInAConfiguredExpression()
-        {
-            Should.Throw<MappingException>(() =>
-            {
-                using (var mapper = Mapper.CreateNew())
-                {
-                    mapper.WhenMapping
-                        .From<PublicGetMethod<string>>()
-                        .To<PublicField<short>>()
-                        .Map((s, t) => int.Parse(s.GetValue()) / 0)
-                        .To(x => x.Value);
-
-                    var source = new PublicGetMethod<string>("1234");
-                    var result = mapper.Map(source).ToANew<PublicField<short>>();
-
-                    result.Value.ShouldBeDefault();
-                }
-            });
-        }
-
-        [Fact]
-        public void ShouldApplyAConfiguredExpressionInAMemberEnumerable()
+        public void ShouldApplyAnExpressionToAMemberEnumerable()
         {
             using (var mapper = Mapper.CreateNew())
             {
@@ -587,7 +653,7 @@
         }
 
         [Fact]
-        public void ShouldApplyAConfiguredExpressionToAnArray()
+        public void ShouldApplyAnExpressionToAnArray()
         {
             using (var mapper = Mapper.CreateNew())
             {
@@ -609,7 +675,7 @@
         }
 
         [Fact]
-        public void ShouldApplyAConfiguredExpressionInAMemberNonGenericEnumerableConditionally()
+        public void ShouldApplyAnExpressionToAMemberNonGenericEnumerableConditionally()
         {
             using (var mapper = Mapper.CreateNew())
             {
@@ -639,7 +705,7 @@
         }
 
         [Fact]
-        public void ShouldApplyAConfiguredExpressionWithMultipleNestedSourceMembers()
+        public void ShouldApplyAnExpressionWithMultipleNestedSourceMembers()
         {
             using (var mapper = Mapper.CreateNew())
             {
@@ -657,7 +723,7 @@
         }
 
         [Fact]
-        public void ShouldApplyAConfiguredExpressionToADerivedTargetType()
+        public void ShouldApplyAnExpressionToADerivedTargetType()
         {
             using (var mapper = Mapper.CreateNew())
             {
@@ -675,7 +741,7 @@
         }
 
         [Fact]
-        public void ShouldApplyAConfiguredExpressionInARootCollectionConditionally()
+        public void ShouldApplyAnExpressionToARootCollectionConditionally()
         {
             using (var mapper = Mapper.CreateNew())
             {
@@ -708,7 +774,7 @@
         }
 
         [Fact]
-        public void ShouldApplyAConfiguredFunction()
+        public void ShouldApplyAFunction()
         {
             using (var mapper = Mapper.CreateNew())
             {
@@ -729,7 +795,7 @@
         }
 
         [Fact]
-        public void ShouldApplyAConfiguredComplexType()
+        public void ShouldApplyASourceComplexTypeMember()
         {
             using (var mapper = Mapper.CreateNew())
             {
@@ -750,7 +816,7 @@
         }
 
         [Fact]
-        public void ShouldWrapAConfiguredComplexTypeDataSourceException()
+        public void ShouldWrapAComplexTypeDataSourceException()
         {
             var mappingEx = Should.Throw<MappingException>(() =>
             {
@@ -783,7 +849,7 @@
         }
 
         [Fact]
-        public void ShouldApplyAConfiguredNestedComplexType()
+        public void ShouldApplyASourceNestedComplexType()
         {
             using (var mapper = Mapper.CreateNew())
             {
@@ -809,7 +875,7 @@
         }
 
         [Fact]
-        public void ShouldHandleANullAConfiguredNestedComplexType()
+        public void ShouldHandleANullNestedComplexTypeSourceMember()
         {
             using (var mapper = Mapper.CreateNew())
             {
@@ -831,7 +897,7 @@
         }
 
         [Fact]
-        public void ShouldApplyAConfiguredComplexTypeConditionally()
+        public void ShouldApplyAComplexTypeMemberConditionally()
         {
             using (var mapper = Mapper.CreateNew())
             {
@@ -874,7 +940,7 @@
         }
 
         [Fact]
-        public void ShouldApplyAConfiguredComplexTypeEnumerable()
+        public void ShouldApplyAComplexTypeEnumerableMember()
         {
             using (var mapper = Mapper.CreateNew())
             {
@@ -892,7 +958,7 @@
         }
 
         [Fact]
-        public void ShouldApplyAConfiguredComplexTypeEnumerableConditionally()
+        public void ShouldApplyAComplexTypeEnumerableMemberConditionally()
         {
             using (var mapper = Mapper.CreateNew())
             {
@@ -936,7 +1002,7 @@
 
         // See https://github.com/agileobjects/AgileMapper/issues/113
         [Fact]
-        public void ShouldApplyAConfiguredComplexToSimpleTypeEnumerableProjection()
+        public void ShouldApplyAComplexToSimpleTypeEnumerableProjection()
         {
             using (var mapper = Mapper.CreateNew())
             {
@@ -966,7 +1032,7 @@
 
         // See https://github.com/agileobjects/AgileMapper/issues/113
         [Fact]
-        public void ShouldApplyAConfiguredComplexToSimpleTypeEnumerableProjectionToTheRootTarget()
+        public void ShouldApplyAComplexToSimpleTypeEnumerableProjectionToTheRootTarget()
         {
             using (var mapper = Mapper.CreateNew())
             {
@@ -991,7 +1057,7 @@
         }
 
         [Fact]
-        public void ShouldApplyAConfiguredSourceAndTargetFunction()
+        public void ShouldApplyASourceAndTargetFunction()
         {
             using (var mapper = Mapper.CreateNew())
             {
@@ -1012,7 +1078,7 @@
         }
 
         [Fact]
-        public void ShouldApplyAConfiguredSourceTargetAndIndexFunction()
+        public void ShouldApplyASourceTargetAndIndexFunction()
         {
             using (var mapper = Mapper.CreateNew())
             {
@@ -1034,7 +1100,7 @@
         }
 
         [Fact]
-        public void ShouldMapAConfiguredFunction()
+        public void ShouldMapAFunction()
         {
             using (var mapper = Mapper.CreateNew())
             {
@@ -1055,7 +1121,7 @@
         }
 
         [Fact]
-        public void ShouldApplyAConfiguredExpressionUsingExtensionMethods()
+        public void ShouldApplyAnExpressionUsingExtensionMethods()
         {
             using (var mapper = Mapper.CreateNew())
             {
@@ -1249,7 +1315,7 @@
 
         // See https://github.com/agileobjects/AgileMapper/issues/146
         [Fact]
-        public void ShouldApplyAConfiguredSourceInterfaceMember()
+        public void ShouldApplyANestedSourceInterfaceMember()
         {
             using (var mapper = Mapper.CreateNew())
             {
@@ -1272,7 +1338,7 @@
 
         // See https://github.com/agileobjects/AgileMapper/issues/64
         [Fact]
-        public void ShouldApplyAConfiguredToTargetDataSource()
+        public void ShouldApplyAToTargetDataSource()
         {
             using (var mapper = Mapper.CreateNew())
             {
@@ -1294,7 +1360,7 @@
         }
 
         [Fact]
-        public void ShouldApplyANestedOverwriteConfiguredToTargetDataSource()
+        public void ShouldApplyANestedOverwriteToTargetDataSource()
         {
             using (var mapper = Mapper.CreateNew())
             {
@@ -1329,8 +1395,30 @@
             }
         }
 
+        // See https://github.com/agileobjects/AgileMapper/issues/174
         [Fact]
-        public void ShouldHandleAConfiguredRootSourceNullValue()
+        public void ShouldApplyASimpleTypeToTargetDataSourceAtRuntime()
+        {
+            using (var mapper = Mapper.CreateNew())
+            {
+                var source = new PublicField<object> { Value = 123 };
+
+                mapper.WhenMapping
+                    .From<int>()
+                    .To<PublicField<int>>()
+                    .Map(i => i, t => t.Value);
+
+                var result = source
+                    .MapUsing(mapper)
+                    .ToANew<PublicProperty<PublicField<int>>>();
+
+                result.Value.ShouldNotBeNull();
+                result.Value.Value.ShouldBe(123);
+            }
+        }
+
+        [Fact]
+        public void ShouldHandleANullToTargetValue()
         {
             using (var mapper = Mapper.CreateNew())
             {
@@ -1353,7 +1441,7 @@
         }
 
         [Fact]
-        public void ShouldApplyAConfiguredRootSourceConditionally()
+        public void ShouldApplyAToTargetDataSourceConditionally()
         {
             using (var mapper = Mapper.CreateNew())
             {
@@ -1429,7 +1517,7 @@
         }
 
         [Fact]
-        public void ShouldApplyAConfiguredRootSourceToANestedMember()
+        public void ShouldApplyAToTargetComplexTypeToANestedMember()
         {
             using (var mapper = Mapper.CreateNew())
             {
@@ -1699,7 +1787,7 @@
         }
 
         [Fact]
-        public void ShouldConditionallyApplyAToTargetSimpleTypeToANestedComplexTypeMember()
+        public void ShouldApplyAToTargetSimpleTypeToANestedComplexTypeMemberConditionally()
         {
             using (var mapper = Mapper.CreateNew())
             {
@@ -1889,6 +1977,7 @@
         // ReSharper restore CollectionNeverQueried.Local
 
         // ReSharper disable InconsistentNaming
+
         internal static class Issue145
         {
             public class IdsSource
@@ -1990,6 +2079,20 @@
                     public string Name { get; set; }
                 }
             }
+        }
+
+        internal static T ReturnNull<T>()
+            where T : class
+        {
+            return null;
+        }
+
+        internal T ReturnInstance<T>()
+            where T : class, new()
+        {
+            ++_returnInstanceCount;
+
+            return new T();
         }
 
         #endregion

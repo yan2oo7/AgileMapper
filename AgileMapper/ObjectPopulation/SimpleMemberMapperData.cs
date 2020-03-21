@@ -11,17 +11,18 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
 
     internal class SimpleMemberMapperData : MemberMapperDataBase, IMemberMapperData
     {
-        private SimpleMemberMapperData(IQualifiedMember sourceMember, IMemberMapperData memberMapperData)
+        private SimpleMemberMapperData(
+            IQualifiedMember sourceMember,
+            IMemberMapperData memberMapperData)
             : base(
                 memberMapperData.RuleSet,
                 sourceMember,
                 memberMapperData.TargetMember,
-                memberMapperData.MapperContext,
-                memberMapperData.Parent)
+                memberMapperData.Parent,
+                memberMapperData.MapperContext)
         {
-            ParentObject = GetParentObjectAccess();
-            EnumerableIndex = GetEnumerableIndexAccess();
-            EnumerableIndexValue = Parent.EnumerableIndex;
+            ElementIndexValue = Parent.ElementIndex;
+            Values = new DirectAccessMapperDataValuesSource(this, memberMapperData, null);
         }
 
         private SimpleMemberMapperData(
@@ -32,12 +33,15 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
                 enumerableMapperData.RuleSet,
                 sourceMember,
                 targetMember,
-                enumerableMapperData.MapperContext,
-                enumerableMapperData)
+                enumerableMapperData,
+                enumerableMapperData.MapperContext)
         {
-            ParentObject = GetParentObjectAccess();
-            EnumerableIndex = GetEnumerableIndexAccess();
-            EnumerableIndexValue = enumerableMapperData.EnumerablePopulationBuilder.Counter.GetConversionTo<int?>();
+            ElementIndexValue = enumerableMapperData.EnumerablePopulationBuilder.Counter.GetConversionTo<int?>();
+
+            Values = new DirectAccessMapperDataValuesSource(
+                this,
+                enumerableMapperData,
+                enumerableMapperData.EnumerablePopulationBuilder);
         }
 
         #region Factory Method
@@ -60,20 +64,14 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
 
         #endregion
 
-        public bool IsEntryPoint => false;
+        protected override IMapperDataValuesSource Values { get; }
+
+        public override bool IsEntryPoint => false;
 
         public MapperDataContext Context => null;
 
-        public Expression ParentObject { get; }
+        public Expression RootMappingDataObject => Parent.RootMappingDataObject;
 
-        public Expression TargetInstance => TargetObject;
-
-        public Expression CreatedObject => null;
-
-        public Expression EnumerableIndex { get; }
-
-        public Expression EnumerableIndexValue { get; }
-
-        public ExpressionInfoFinder ExpressionInfoFinder => Parent.ExpressionInfoFinder;
+        public Expression ElementIndexValue { get; }
     }
 }

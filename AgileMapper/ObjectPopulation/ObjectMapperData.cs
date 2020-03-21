@@ -3,12 +3,12 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
     using System;
     using System.Collections.Generic;
     using System.Linq;
-    using System.Reflection;
 #if NET35
     using Microsoft.Scripting.Ast;
 #else
     using System.Linq.Expressions;
 #endif
+    using System.Reflection;
     using DataSources;
     using Enumerables;
     using Extensions;
@@ -19,19 +19,20 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
     using NetStandardPolyfills;
     using ReadableExpressions.Extensions;
 
-    internal class ObjectMapperData : BasicMapperData, IMemberMapperData
+    internal class ObjectMapperData : MemberMapperDataBase, IMemberMapperData
     {
         private static readonly MethodInfo _mapRepeatedChildMethod =
-            typeof(IObjectMappingDataUntyped).GetPublicInstanceMethod("MapRepeated", parameterCount: 5);
+            typeof(IObjectMappingDataUntyped).GetPublicInstanceMethod("MapRepeated", parameterCount: 6);
 
         private static readonly MethodInfo _mapRepeatedElementMethod =
-            typeof(IObjectMappingDataUntyped).GetPublicInstanceMethod("MapRepeated", parameterCount: 3);
+            typeof(IObjectMappingDataUntyped).GetPublicInstanceMethod("MapRepeated", parameterCount: 4);
 
-        private readonly IMapperDataValuesSource _values;
-
-        private ExpressionInfoFinder _expressionInfoFinder;
+        private Expression _rootMappingDataObject;
         private ObjectMapperData _entryPointMapperData;
         private MappedObjectCachingMode _mappedObjectCachingMode;
+        private List<ObjectMapperData> _childMapperDatas;
+        private List<ObjectMapperData> _derivedMapperDatas;
+        private Dictionary<QualifiedMember, IDataSourceSet> _dataSourcesByTargetMember;
         private bool? _isRepeatMapping;
         private bool _isEntryPoint;
 
@@ -45,14 +46,11 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
             bool isForStandaloneMapping)
             : base(
                 mappingContext.RuleSet,
-                sourceMember.Type,
-                targetMember.Type,
                 sourceMember,
                 targetMember,
-                parent)
+                parent,
+                mappingContext.MapperContext)
         {
-            MapperContext = mappingContext.MapperContext;
-            ChildMapperDatas = new List<ObjectMapperData>();
             DataSourceIndex = dataSourceIndex.GetValueOrDefault();
 
             var isPartOfDerivedTypeMapping = declaredTypeMapperData != null;
@@ -61,8 +59,6 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
             {
                 DeclaredTypeMapperData = OriginalMapperData = declaredTypeMapperData;
             }
-
-            DataSourcesByTargetMember = new Dictionary<QualifiedMember, IDataSourceSet>();
 
             ReturnLabelTarget = Expression.Label(TargetType, "Return");
             _mappedObjectCachingMode = MapperContext.UserConfigurations.CacheMappedObjects(this);
@@ -74,14 +70,13 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
 
             if (IsRoot)
             {
-                _values = new EntryPointMapperDataValuesSource(this);
+                Values = new EntryPointMapperDataValuesSource(this);
                 TargetTypeHasNotYetBeenMapped = true;
                 TargetTypeWillNotBeMappedAgain = IsTargetTypeLastMapping(parent);
                 Context = new MapperDataContext(this, true, isPartOfDerivedTypeMapping);
                 return;
             }
 
-            Parent = parent;
             parent.ChildMapperDatas.Add(this);
 
             if (this.TargetMemberIsEnumerableElement())
@@ -89,7 +84,7 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
             }
             else
             {
-                _values = new DirectAccessMapperDataValuesSource(
+                Values = new DirectAccessMapperDataValuesSource(
                     this, 
                     OriginalMapperData,
                     EnumerablePopulationBuilder);
@@ -131,7 +126,7 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
             return true;
         }
 
-        private bool HasTypeBeenMapped(Type targetType, IBasicMapperData requestingMapperData)
+        private bool HasTypeBeenMapped(Type targetType, IQualifiedMemberContext requestingMapperData)
         {
             var mappedType = TargetMember.IsEnumerable ? TargetMember.ElementType : TargetType;
 
@@ -140,7 +135,7 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
                 return true;
             }
 
-            foreach (var childMapperData in ChildMapperDatas)
+            foreach (var childMapperData in ChildMapperDatasOrEmpty)
             {
                 if (childMapperData == requestingMapperData)
                 {
@@ -304,7 +299,7 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
             var mapperTypes = new[] { typeof(TSource), typeof(TTarget) };
 
             existingMapperData = GetMapperDataOrNull(
-                parentMapperData.ChildMapperDatas,
+                parentMapperData,
                 mapperTypes,
                 childMembersSource.TargetMemberRegistrationName);
 
@@ -312,11 +307,11 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
         }
 
         private static ObjectMapperData GetMapperDataOrNull(
-            IEnumerable<ObjectMapperData> mapperDatas,
+            ObjectMapperData parentMapperData,
             IList<Type> mapperTypes,
             string targetMemberRegistrationName)
         {
-            foreach (var mapperData in mapperDatas)
+            foreach (var mapperData in parentMapperData.ChildMapperDatasOrEmpty)
             {
                 if ((mapperData.TypesMatch(mapperTypes)) &&
                     (mapperData.TargetMember.RegistrationName == targetMemberRegistrationName))
@@ -324,10 +319,10 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
                     return mapperData;
                 }
 
-                if (mapperData.ChildMapperDatas.Any())
+                if (mapperData.HasChildMapperDatas)
                 {
                     return GetMapperDataOrNull(
-                        mapperData.ChildMapperDatas,
+                        mapperData,
                         mapperTypes,
                         targetMemberRegistrationName);
                 }
@@ -340,22 +335,27 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
 
         public IObjectMapper Mapper { get; set; }
 
-        public MapperContext MapperContext { get; }
-
-        public ObjectMapperData Parent { get; }
-
         public ObjectMapperData DeclaredTypeMapperData { get; }
 
         public ObjectMapperData OriginalMapperData { get; set; }
 
-        public IList<ObjectMapperData> ChildMapperDatas { get; }
+        public bool HasChildMapperDatas => _childMapperDatas?.Count > 0;
+
+        public bool AnyChildMapperDataMatches(Func<ObjectMapperData, bool> matcher) 
+            => _childMapperDatas?.Any(matcher) == true;
+
+        public IList<ObjectMapperData> ChildMapperDatas
+            => _childMapperDatas ?? (_childMapperDatas = new List<ObjectMapperData>());
+
+        public IList<ObjectMapperData> ChildMapperDatasOrEmpty
+            => _childMapperDatas ?? (IList<ObjectMapperData>)Enumerable<ObjectMapperData>.EmptyArray;
+
+        public IList<ObjectMapperData> DerivedMapperDatas
+            => _derivedMapperDatas ?? (_derivedMapperDatas = new List<ObjectMapperData>());
 
         public int DataSourceIndex { get; set; }
 
         public MapperDataContext Context { get; }
-
-        public override bool HasCompatibleTypes(ITypePair typePair)
-            => typePair.HasCompatibleTypes(this, SourceMember, TargetMember);
 
         public IQualifiedMember GetSourceMemberFor(string targetMemberRegistrationName, int dataSourceIndex)
         {
@@ -372,37 +372,7 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
             return targetMember;
         }
 
-        public ParameterExpression MappingDataObject => _values.MappingDataObject;
-
-        public Expression ParentObject => _values.Parent;
-
-        public Expression SourceObject
-        {
-            get => _values.Source;
-            set => _values.Source = value;
-        }
-
-        public Expression TargetObject
-        {
-            get => _values.Target;
-            set => _values.Target = value;
-        }
-
-        public Expression CreatedObject => _values.CreatedObject;
-
-        public Expression EnumerableIndex => _values.EnumerableIndex;
-
-        public Expression TargetInstance
-        {
-            get => _values.TargetInstance;
-            set => _values.TargetInstance = value;
-        }
-
-        public ParameterExpression LocalVariable
-        {
-            get => _values.LocalVariable;
-            set => _values.LocalVariable = value;
-        }
+        protected override IMapperDataValuesSource Values { get; }
 
         public bool CacheMappedObjects
         {
@@ -437,8 +407,15 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
 
         public bool TargetTypeWillNotBeMappedAgain { get; }
 
-        public ExpressionInfoFinder ExpressionInfoFinder
-            => _expressionInfoFinder ?? (_expressionInfoFinder = new ExpressionInfoFinder(_values.RootObjects));
+        public Expression RootMappingDataObject
+            => _rootMappingDataObject ?? (_rootMappingDataObject = GetRootMappingDataObject());
+
+        private Expression GetRootMappingDataObject()
+        {
+            return Context.IsForToTargetMapping
+                ? OriginalMapperData.MappingDataObject
+                : MappingDataObject;
+        }
 
         public EnumerablePopulationBuilder EnumerablePopulationBuilder { get; }
 
@@ -473,11 +450,10 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
             return mapperData.OriginalMapperData;
         }
 
-        public bool IsEntryPoint
-        {
-            get => _isEntryPoint || IsRoot || Context.IsStandalone || IsRepeatMapping;
-            set => _isEntryPoint = value;
-        }
+        public override bool IsEntryPoint
+            => _isEntryPoint || IsRoot || Context.IsStandalone || IsRepeatMapping;
+
+        public void SetEntryPoint() => _isEntryPoint = true;
 
         public bool IsRepeatMapping => (_isRepeatMapping ?? (_isRepeatMapping = this.IsRepeatMapping())).Value;
 
@@ -516,7 +492,8 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
 
         public IList<ObjectMapperKeyBase> RepeatedMapperFuncKeys { get; private set; }
 
-        public Dictionary<QualifiedMember, IDataSourceSet> DataSourcesByTargetMember { get; }
+        public Dictionary<QualifiedMember, IDataSourceSet> DataSourcesByTargetMember
+            => _dataSourcesByTargetMember ?? (_dataSourcesByTargetMember = new Dictionary<QualifiedMember, IDataSourceSet>());
 
         public Expression GetRuntimeTypedMapping(
             Expression sourceObject,
@@ -532,7 +509,7 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
 
             var mapCall = Expression.Call(
                 MappingDataObject,
-                GetMapMethod(MappingDataObject.Type, 4)
+                GetMapMethod(MappingDataObject.Type, typeof(int))
                     .MakeGenericMethod(sourceObject.Type, targetMember.Type),
                 sourceObject,
                 targetMember.GetAccess(this),
@@ -558,11 +535,12 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
 
             var mapCall = Expression.Call(
                 MappingDataObject,
-                GetMapMethod(MappingDataObject.Type, 3)
+                GetMapMethod(MappingDataObject.Type, typeof(object))
                     .MakeGenericMethod(sourceElement.Type, targetElement.Type),
                 sourceElement,
                 targetElement,
-                EnumerablePopulationBuilder.Counter);
+                EnumerablePopulationBuilder.Counter,
+                EnumerablePopulationBuilder.GetElementKey());
 
             return GetSimpleTypeCheckedMapCall(sourceElement, targetElement.Type, mapCall);
         }
@@ -570,8 +548,12 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
         private static bool IsSimpleTypeToObjectMapping(Expression sourceObject, Type targetType)
             => sourceObject.Type.IsSimple() && (targetType == typeof(object));
 
-        private static MethodInfo GetMapMethod(Type mappingDataType, int numberOfArguments)
-            => mappingDataType.GetPublicInstanceMethod("Map", numberOfArguments);
+        private static MethodInfo GetMapMethod(Type mappingDataType, Type finalParameterType)
+        {
+            return mappingDataType
+                .GetPublicInstanceMethods("Map")
+                .First(m => m.GetParameters().Last().ParameterType == finalParameterType);
+        }
 
         private static Expression GetSimpleTypeCheckedMapCall(
             Expression sourceObject,
@@ -612,7 +594,8 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
                 {
                     mappingValues.SourceValue,
                     mappingValues.TargetValue,
-                    mappingValues.EnumerableIndex,
+                    mappingValues.ElementIndex,
+                    mappingValues.ElementKey
                 };
             }
             else
@@ -623,7 +606,8 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
                 {
                     mappingValues.SourceValue,
                     mappingValues.TargetValue,
-                    EnumerableIndex,
+                    ElementIndex,
+                    ElementKey,
                     targetMember.RegistrationName.ToConstantExpression(),
                     dataSourceIndex.ToConstantExpression()
                 };
@@ -641,15 +625,16 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
             return mapRepeatedCall;
         }
 
-        public IBasicMapperData WithNoTargetMember()
+        public IQualifiedMemberContext WithNoTargetMember()
         {
-            return new BasicMapperData(
+            return new QualifiedMemberContext(
                 RuleSet,
                 SourceType,
                 TargetType,
                 SourceMember,
                 QualifiedMember.None,
-                Parent);
+                Parent,
+                MapperContext);
         }
 
         #region ToString

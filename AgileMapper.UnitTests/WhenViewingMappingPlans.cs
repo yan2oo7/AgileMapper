@@ -218,7 +218,7 @@
                 .ToANew<PublicSetMethod<ICollection<Product>>>();
 
             plan.ShouldContain("// Map PublicProperty<object[]> -> PublicSetMethod<ICollection<Product>>");
-            plan.ShouldContain("products.Add(oaToPsData.Map(objectArray[i]");
+            RemoveWhiteSpace(plan).ShouldContain("products.Add(oaToPsData.Map(objectArray[i]");
         }
 
         // See https://github.com/agileobjects/AgileMapper/issues/24
@@ -239,6 +239,8 @@
             {
                 string plan = mapper.GetPlanFor<Parent>().ToANew<Parent>();
 
+                plan.ShouldContain("pToPData =>");
+                
                 plan.ShouldContain("pToPData.Register(sourceParent, parent)");
                 plan.ShouldContain("pToPData.Register(sourceParent.EldestChild, child)");
 
@@ -304,6 +306,17 @@
                 plan.ShouldNotContain("Select(v => v * 2) != null");
                 plan.ShouldNotContain("ToArray() != null");
             }
+        }
+
+        [Fact]
+        public void ShouldCacheComplexTypeGetMethodResults()
+        {
+            string plan  = Mapper
+                .GetPlanFor<PublicField<PublicGetMethod<Address>>>()
+                .ToANew<PublicProperty<PublicProperty<Address>>>();
+
+            plan.ShouldContain("Value.GetValue()");
+            Regex.Matches(plan, @"Value.GetValue\(\)").Cast<Match>().ShouldHaveSingleItem();
         }
 
         [Fact]
@@ -420,7 +433,10 @@
             }
         }
 
-        #region Helper Classes
+        #region Helper Members
+
+        private static string RemoveWhiteSpace(string plan) 
+            => plan.Replace(Environment.NewLine, null).Replace(" ", null);
 
         internal static class Issue146
         {

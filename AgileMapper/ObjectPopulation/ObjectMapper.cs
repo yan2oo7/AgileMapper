@@ -30,11 +30,7 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
 
             if (mapperDataContext.IsStandalone && !mapperDataContext.IsForDerivedType)
             {
-                var mappingLambda = Expression.Lambda<MapperFunc<TSource, TTarget>>(
-                    mapping,
-                    mapperData.MappingDataObject);
-
-                _mapperFunc = mappingLambda.Compile();
+                _mapperFunc = GetMappingLambda().Compile();
             }
             else if (mapperDataContext.NeedsRuntimeTypedMapping)
             {
@@ -100,6 +96,15 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
         #endregion
 
         public Expression Mapping { get; }
+
+        LambdaExpression IObjectMapper.GetMappingLambda() => GetMappingLambda();
+
+        private Expression<MapperFunc<TSource, TTarget>> GetMappingLambda()
+        {
+            return Expression.Lambda<MapperFunc<TSource, TTarget>>(
+                Mapping,
+                MapperData.MappingDataObject);
+        }
 
         public ObjectMapperData MapperData { get; }
 

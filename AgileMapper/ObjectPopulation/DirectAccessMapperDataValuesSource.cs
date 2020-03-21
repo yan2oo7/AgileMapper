@@ -18,7 +18,8 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
         private Expression _targetInstance;
         private ParameterExpression _localVariable;
         private Expression _createdObject;
-        private Expression _enumerableIndex;
+        private Expression _elementIndex;
+        private Expression _elementKey;
 
         public DirectAccessMapperDataValuesSource(
             IMemberMapperData mapperData,
@@ -65,16 +66,26 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
         public Expression CreatedObject
             => _createdObject ?? (_createdObject = TargetInstance);
 
-        public Expression EnumerableIndex
-            => _enumerableIndex ?? (_enumerableIndex = GetEnumerableIndex());
+        public Expression ElementIndex
+            => _elementIndex ?? (_elementIndex = GetElementIndex());
 
-        public IList<Expression> RootObjects { get; }
-
-        private Expression GetEnumerableIndex()
+        private Expression GetElementIndex()
         {
-            return _originalMapperData?.EnumerableIndex ??
+            return _originalMapperData?.ElementIndex ??
                    _enumerablePopulationBuilder?.Counter ??
                    (Expression)default(int?).ToConstantExpression();
         }
+
+        public Expression ElementKey
+            => _elementKey ?? (_elementKey = GetElementKey());
+
+        private Expression GetElementKey()
+        {
+            return _originalMapperData?.ElementKey ??
+                   _enumerablePopulationBuilder?.GetElementKey() ??
+                   Constants.NullObject;
+        }
+
+        public IList<Expression> RootObjects { get; }
     }
 }
