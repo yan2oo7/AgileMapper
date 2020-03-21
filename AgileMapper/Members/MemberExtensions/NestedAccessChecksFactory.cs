@@ -21,7 +21,7 @@
 
     internal class NestedAccessChecksFactory : ExpressionVisitor
     {
-        private readonly Expression _rootMappingData;
+        private readonly IList<Expression> _rootObjects;
         private readonly bool _includeTargetNullChecking;
         private readonly bool _invertChecks;
         private ICollection<Expression> _stringMemberAccessSubjects;
@@ -33,7 +33,7 @@
             bool targetCanBeNull,
             bool invertChecks)
         {
-            _rootMappingData = mapperData?.RootMappingDataObject;
+            _rootObjects = mapperData.RootObjects ?? Enumerable<Expression>.EmptyArray;
             _includeTargetNullChecking = targetCanBeNull;
             _invertChecks = invertChecks;
         }
@@ -62,7 +62,7 @@
         private Dictionary<string, Expression> NestedAccessesByPath
             => _nestedAccessesByPath ?? (_nestedAccessesByPath = new Dictionary<string, Expression>());
 
-        public Expression CreateFor(Expression expression)
+        private Expression CreateFor(Expression expression)
         {
             Visit(expression);
 
@@ -211,30 +211,26 @@
 
         private bool IsRootObject(MemberExpression memberAccess)
         {
-            if (memberAccess.Member.Name == nameof(IMappingData.Parent))
-            {
-                // ReSharper disable once PossibleNullReferenceException
-                return memberAccess.Member.DeclaringType.Name
-                    .StartsWith(nameof(IMappingData), StringComparison.Ordinal);
-            }
-
-            if (memberAccess.Expression != _rootMappingData)
-            {
-                return false;
-            }
-
             switch (memberAccess.Member.Name)
             {
-                case nameof(IMappingData<int, int>.ElementIndex):
+                case nameof(IMappingData.Parent):
                 case RootSourceMemberName:
-                    return true;
+                case nameof(IMappingData<int, int>.ElementIndex):
+                case nameof(IMappingData<int, int>.ElementKey):
+                    return IsMappingDataMember(memberAccess);
 
                 case RootTargetMemberName:
-                    return _includeTargetNullChecking;
+                    return _includeTargetNullChecking && IsMappingDataMember(memberAccess);
 
                 default:
-                    return false;
+                    return _rootObjects.Contains(memberAccess.Expression);
             }
+        }
+
+        private static bool IsMappingDataMember(MemberExpression memberAccess)
+        {
+            return memberAccess.Member.DeclaringType.Name
+                .StartsWith(nameof(IMappingData), StringComparison.Ordinal);
         }
 
         protected override Expression VisitIndex(IndexExpression indexAccess)
@@ -273,7 +269,7 @@
 
         protected override Expression VisitMethodCall(MethodCallExpression methodCall)
         {
-            if (methodCall.IsMappingDataObjectCall(_rootMappingData))
+            if (methodCall.IsMappingDataObjectCall(_rootObjects))
             {
                 return base.VisitMethodCall(methodCall);
             }
@@ -297,9 +293,7 @@
         }
 
         private void AddExistingNullCheck(Expression checkedAccess)
-        {
-            NullCheckSubjects.Add(checkedAccess.ToString());
-        }
+            => NullCheckSubjects.Add(checkedAccess.ToString());
 
         private void AddStringMemberAccessSubjectIfAppropriate(Expression member)
         {
@@ -354,7 +348,7 @@
             }
 
             if (memberAccess.Type.CannotBeNull() ||
-             ((_rootMappingData != null) && !memberAccess.IsRootedIn(_rootMappingData)))
+               _rootObjects.Any(memberAccess, (ma, ro) => ma.IsRootedIn(ro)))
             {
                 return false;
             }

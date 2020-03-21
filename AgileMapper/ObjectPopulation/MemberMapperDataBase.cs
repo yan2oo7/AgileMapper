@@ -1,15 +1,12 @@
 namespace AgileObjects.AgileMapper.ObjectPopulation
 {
-    using System;
-    using System.Globalization;
+    using System.Collections.Generic;
 #if NET35
     using Microsoft.Scripting.Ast;
 #else
     using System.Linq.Expressions;
 #endif
-    using Extensions.Internal;
     using Members;
-    using NetStandardPolyfills;
 
     internal abstract class MemberMapperDataBase : QualifiedMemberContext
     {
@@ -29,9 +26,6 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
                 mapperContext)
         {
             Parent = parent;
-            MappingDataType = typeof(IMappingData<,>).MakeGenericType(SourceType, TargetType);
-            SourceObject = GetMappingDataProperty(MappingDataType, Member.RootSourceMemberName);
-            TargetObject = GetMappingDataProperty(Member.RootTargetMemberName);
         }
 
         protected abstract IMapperDataValuesSource Values { get; }
@@ -39,6 +33,8 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
         public ObjectMapperData Parent { get; }
 
         public ParameterExpression MappingDataObject => Values.MappingDataObject;
+
+        public IList<Expression> RootObjects => Values.RootObjects;
 
         public Expression ParentObject => Values.Parent;
 
@@ -71,26 +67,5 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
             get => Values.LocalVariable;
             set => Values.LocalVariable = value;
         }
-
-        protected Type MappingDataType { get; }
-
-        protected Expression GetElementIndexAccess()
-            => GetMappingDataProperty(MappingDataType, "ElementIndex");
-
-        protected Expression GetElementKeyAccess()
-            => GetMappingDataProperty(MappingDataType, "ElementKey");
-
-        protected Expression GetParentObjectAccess()
-            => GetMappingDataProperty(nameof(Parent));
-
-        protected Expression GetMappingDataProperty(Type mappingDataType, string propertyName)
-        {
-            var property = mappingDataType.GetPublicInstanceProperty(propertyName);
-
-            return Expression.Property(MappingDataObject, property);
-        }
-
-        protected Expression GetMappingDataProperty(string propertyName)
-            => Expression.Property(MappingDataObject, propertyName);
     }
 }

@@ -27,7 +27,6 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
         private static readonly MethodInfo _mapRepeatedElementMethod =
             typeof(IObjectMappingDataUntyped).GetPublicInstanceMethod("MapRepeated", parameterCount: 4);
 
-        private Expression _rootMappingDataObject;
         private ObjectMapperData _entryPointMapperData;
         private MappedObjectCachingMode _mappedObjectCachingMode;
         private List<ObjectMapperData> _childMapperDatas;
@@ -72,7 +71,7 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
             {
                 Values = new EntryPointMapperDataValuesSource(this);
                 TargetTypeHasNotYetBeenMapped = true;
-                TargetTypeWillNotBeMappedAgain = IsTargetTypeLastMapping(parent);
+                TargetTypeWillNotBeMappedAgain = IsTargetTypeLastMapping(parent: null);
                 Context = new MapperDataContext(this, true, isPartOfDerivedTypeMapping);
                 return;
             }
@@ -85,10 +84,10 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
             else
             {
                 Values = new DirectAccessMapperDataValuesSource(
-                    this, 
+                    this,
                     OriginalMapperData,
                     EnumerablePopulationBuilder);
-                
+
                 TargetTypeHasNotYetBeenMapped = IsTargetTypeFirstMapping(parent);
                 TargetTypeWillNotBeMappedAgain = IsTargetTypeLastMapping(parent);
             }
@@ -341,7 +340,7 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
 
         public bool HasChildMapperDatas => _childMapperDatas?.Count > 0;
 
-        public bool AnyChildMapperDataMatches(Func<ObjectMapperData, bool> matcher) 
+        public bool AnyChildMapperDataMatches(Func<ObjectMapperData, bool> matcher)
             => _childMapperDatas?.Any(matcher) == true;
 
         public IList<ObjectMapperData> ChildMapperDatas
@@ -406,16 +405,6 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
         public bool TargetTypeWillBeMappedAgain => !TargetTypeWillNotBeMappedAgain;
 
         public bool TargetTypeWillNotBeMappedAgain { get; }
-
-        public Expression RootMappingDataObject
-            => _rootMappingDataObject ?? (_rootMappingDataObject = GetRootMappingDataObject());
-
-        private Expression GetRootMappingDataObject()
-        {
-            return Context.IsForToTargetMapping
-                ? OriginalMapperData.MappingDataObject
-                : MappingDataObject;
-        }
 
         public EnumerablePopulationBuilder EnumerablePopulationBuilder { get; }
 

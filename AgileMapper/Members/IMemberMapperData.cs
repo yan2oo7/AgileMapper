@@ -1,5 +1,6 @@
 ﻿namespace AgileObjects.AgileMapper.Members
 {
+    using System.Collections.Generic;
 #if NET35
     using Microsoft.Scripting.Ast;
 #else
@@ -17,7 +18,7 @@
 
         ParameterExpression MappingDataObject { get; }
 
-        Expression RootMappingDataObject { get; }
+        IList<Expression> RootObjects { get; }
 
         Expression SourceObject { get; }
 

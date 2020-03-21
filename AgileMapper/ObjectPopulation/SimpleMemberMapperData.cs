@@ -22,7 +22,11 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
                 memberMapperData.MapperContext)
         {
             ElementIndexValue = Parent.ElementIndex;
-            Values = new DirectAccessMapperDataValuesSource(this, memberMapperData, null);
+
+            Values = new DirectAccessMapperDataValuesSource(
+                this,
+                memberMapperData,
+                memberMapperData.Parent.EnumerablePopulationBuilder);
         }
 
         private SimpleMemberMapperData(
@@ -69,8 +73,6 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
         public override bool IsEntryPoint => false;
 
         public MapperDataContext Context => null;
-
-        public Expression RootMappingDataObject => Parent.RootMappingDataObject;
 
         public Expression ElementIndexValue { get; }
     }

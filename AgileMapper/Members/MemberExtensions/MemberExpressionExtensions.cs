@@ -1,6 +1,7 @@
 namespace AgileObjects.AgileMapper.Members.MemberExtensions
 {
     using System;
+    using System.Collections.Generic;
 #if NET35
     using Microsoft.Scripting.Ast;
 #else
@@ -11,10 +12,10 @@ namespace AgileObjects.AgileMapper.Members.MemberExtensions
     {
         public static bool IsMappingDataObjectCall(
             this MethodCallExpression methodCall,
-            Expression rootMappingDataObject)
+            ICollection<Expression> rootObjects)
         {
             return (methodCall.Method.DeclaringType == typeof(IMappingData)) ||
-                   (methodCall.Object == rootMappingDataObject);
+                    rootObjects.Contains(methodCall.Object);
         }
 
         public static TryExpression WrapInTryCatch(this Expression mapping, IMemberMapperData mapperData)

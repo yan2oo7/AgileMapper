@@ -62,13 +62,13 @@
 
         private class MultiInvocationsFinderInstance : ExpressionVisitor
         {
-            private readonly Expression _rootMappingData;
+            private readonly IList<Expression> _rootObjects;
             private List<Expression> _allInvocations;
             private ICollection<Expression> _multiInvocations;
 
             public MultiInvocationsFinderInstance(IMemberMapperData mapperData)
             {
-                _rootMappingData = mapperData.RootMappingDataObject;
+                _rootObjects = mapperData.RootObjects;
             }
 
             private ICollection<Expression> AllInvocations
@@ -93,7 +93,7 @@
 
             protected override Expression VisitMethodCall(MethodCallExpression methodCall)
             {
-                if (methodCall.IsMappingDataObjectCall(_rootMappingData))
+                if (methodCall.IsMappingDataObjectCall(_rootObjects))
                 {
                     return base.VisitMethodCall(methodCall);
                 }
