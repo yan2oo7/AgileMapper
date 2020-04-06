@@ -1,17 +1,20 @@
-namespace AgileObjects.AgileMapper.ObjectPopulation.Enumerables.Dictionaries
+namespace AgileObjects.AgileMapper.ObjectPopulation.Enumerables.Dictionaries.SourceAdapters
 {
     using System.Collections.Generic;
     using System.Linq;
-    using DataSources;
-    using Extensions.Internal;
-    using Members;
-    using Members.Dictionaries;
-    using NetStandardPolyfills;
 #if NET35
     using Microsoft.Scripting.Ast;
 #else
     using System.Linq.Expressions;
 #endif
+    using DataSources;
+    using Enumerables.Looping;
+    using Enumerables.SourceAdapters;
+    using Extensions.Internal;
+    using Looping;
+    using Members;
+    using Members.Dictionaries;
+    using NetStandardPolyfills;
 
     internal class SourceElementsDictionaryAdapter : SourceEnumerableAdapterBase, ISourceEnumerableAdapter
     {
