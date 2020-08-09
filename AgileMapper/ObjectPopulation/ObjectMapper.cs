@@ -28,7 +28,7 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
             var mapperData = MapperData = mappingData.MapperData;
             var mapperDataContext = mapperData.Context;
 
-            if (mapperDataContext.IsStandalone && !mapperDataContext.IsForDerivedType)
+            if (mapperDataContext.Compile)
             {
                 _mapperFunc = GetMappingLambda().Compile();
             }

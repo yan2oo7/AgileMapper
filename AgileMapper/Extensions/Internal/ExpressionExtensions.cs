@@ -44,6 +44,8 @@
                    (memberAccess.Expression.Type.IsNullableType());
         }
 
+        public static bool IsInvocation(this LambdaExpression lambda) => lambda.Body.NodeType == Invoke;
+
         public static Expression Negate(this Expression expression)
             => (expression.NodeType != Not) ? Expression.Not(expression) : ((UnaryExpression)expression).Operand;
 
@@ -59,8 +61,16 @@
         public static DefaultExpression ToDefaultExpression(this Type type) => Expression.Default(type);
 
         [DebuggerStepThrough]
-        public static ConditionalExpression ToIfFalseDefaultCondition(this Expression value, Expression condition)
-            => Expression.Condition(condition, value, value.Type.ToDefaultExpression());
+        public static ConditionalExpression ToIfFalseDefaultCondition(
+            this Expression value,
+            Expression condition,
+            Expression defaultValue = null)
+        {
+            return Expression.Condition(
+                condition,
+                value,
+                defaultValue ?? value.Type.ToDefaultExpression());
+        }
 
         public static Expression AndTogether(this IList<Expression> expressions)
         {
@@ -307,6 +317,9 @@
                 expression = parent;
             }
         }
+
+        public static Expression ToExpression(this IList<Expression> expressions)
+            => expressions.HasOne() ? expressions.First() : Expression.Block(expressions);
 
         public static bool TryGetVariableAssignment(this IList<Expression> mappingExpressions, out BinaryExpression binaryExpression)
         {

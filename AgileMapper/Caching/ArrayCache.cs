@@ -2,6 +2,7 @@
 {
     using System;
     using System.Collections.Generic;
+    using Extensions.Internal;
 
     internal class ArrayCache<TKey, TValue> : ICache<TKey, TValue>
     {
@@ -78,7 +79,8 @@
                     _keys[_length] = key;
                 }
 
-                _values[_length++] = value;
+                _values[_length] = value;
+                _length++;
             }
 
             return value;
@@ -159,29 +161,17 @@
             }
 
             _capacity += DefaultCapacity;
-            _values = ResizeToCapacity(_values);
+            _values = _values.EnlargeToArray(_capacity);
 
             if (UseHashCodes)
             {
-                _hashCodes = ResizeToCapacity(_hashCodes);
-                _keyIndexes = ResizeToCapacity(_keyIndexes);
+                _hashCodes = _hashCodes.EnlargeToArray(_capacity);
+                _keyIndexes = _keyIndexes.EnlargeToArray(_capacity);
             }
             else
             {
-                _keys = ResizeToCapacity(_keys);
+                _keys = _keys.EnlargeToArray(_capacity);
             }
-        }
-
-        private T[] ResizeToCapacity<T>(IList<T> existingArray)
-        {
-            var biggerArray = new T[_capacity];
-
-            for (var i = 0; i < _length; i++)
-            {
-                biggerArray[i] = existingArray[i];
-            }
-
-            return biggerArray;
         }
 
         private void StoreHashCode(TKey key)

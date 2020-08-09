@@ -17,50 +17,40 @@
 #else
     using static System.Linq.Expressions.ExpressionType;
 #endif
-    using static AgileObjects.AgileMapper.Members.Member;
+    using static Member;
 
     internal class NestedAccessChecksFactory : ExpressionVisitor
     {
         private readonly IList<Expression> _rootObjects;
-        private readonly bool _includeTargetNullChecking;
         private readonly bool _invertChecks;
         private ICollection<Expression> _stringMemberAccessSubjects;
         private ICollection<string> _nullCheckSubjects;
         private Dictionary<string, Expression> _nestedAccessesByPath;
 
-        private NestedAccessChecksFactory(
-            IMemberMapperData mapperData,
-            bool targetCanBeNull,
-            bool invertChecks)
+        private NestedAccessChecksFactory(IMemberMapperData mapperData, bool invertChecks)
         {
             _rootObjects = mapperData.RootObjects ?? Enumerable<Expression>.EmptyArray;
-            _includeTargetNullChecking = targetCanBeNull;
             _invertChecks = invertChecks;
         }
 
         public static Expression GetNestedAccessChecksFor(
             Expression expression,
             IMemberMapperData mapperData = null,
-            bool targetCanBeNull = false,
             bool invertChecks = false)
         {
-            var factory = new NestedAccessChecksFactory(
-                mapperData,
-                targetCanBeNull,
-                invertChecks);
-
+            var factory = new NestedAccessChecksFactory(mapperData, invertChecks);
             var checks = factory.CreateFor(expression);
             return checks;
         }
 
         private ICollection<Expression> StringMemberAccessSubjects
-            => _stringMemberAccessSubjects ?? (_stringMemberAccessSubjects = new List<Expression>());
+            => _stringMemberAccessSubjects ??= new List<Expression>();
 
         private ICollection<string> NullCheckSubjects
-            => _nullCheckSubjects ?? (_nullCheckSubjects = new List<string>());
+            => _nullCheckSubjects ??= new List<string>();
 
         private Dictionary<string, Expression> NestedAccessesByPath
-            => _nestedAccessesByPath ?? (_nestedAccessesByPath = new Dictionary<string, Expression>());
+            => _nestedAccessesByPath ??= new Dictionary<string, Expression>();
 
         private Expression CreateFor(Expression expression)
         {
@@ -211,26 +201,31 @@
 
         private bool IsRootObject(MemberExpression memberAccess)
         {
-            switch (memberAccess.Member.Name)
+            var memberName = memberAccess.Member.Name;
+
+            if (memberName == nameof(IMappingData.Parent))
             {
-                case nameof(IMappingData.Parent):
-                case RootSourceMemberName:
+                // ReSharper disable once PossibleNullReferenceException
+                return memberAccess.Member.DeclaringType.Name
+                    .StartsWith(nameof(IMappingData), StringComparison.Ordinal);
+            }
+
+            if (!_rootObjects.Contains(memberAccess.Expression))
+            {
+                return false;
+            }
+
+            switch (memberName)
+            {
                 case nameof(IMappingData<int, int>.ElementIndex):
                 case nameof(IMappingData<int, int>.ElementKey):
-                    return IsMappingDataMember(memberAccess);
-
+                case RootSourceMemberName:
                 case RootTargetMemberName:
-                    return _includeTargetNullChecking && IsMappingDataMember(memberAccess);
+                    return true;
 
                 default:
-                    return _rootObjects.Contains(memberAccess.Expression);
+                    return false;
             }
-        }
-
-        private static bool IsMappingDataMember(MemberExpression memberAccess)
-        {
-            return memberAccess.Member.DeclaringType.Name
-                .StartsWith(nameof(IMappingData), StringComparison.Ordinal);
         }
 
         protected override Expression VisitIndex(IndexExpression indexAccess)
@@ -373,6 +368,7 @@
 
             switch (method.Name)
             {
+                case nameof(GetType) when method.DeclaringType == typeof(object):
                 case nameof(string.ToString) when method.DeclaringType == typeof(object):
                 case nameof(string.Split) when method.DeclaringType == typeof(string):
                 case nameof(IEnumerable<int>.GetEnumerator) when method.DeclaringType.IsClosedTypeOf(typeof(IEnumerable<>)):

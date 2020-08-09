@@ -344,13 +344,13 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
             => _childMapperDatas?.Any(matcher) == true;
 
         public IList<ObjectMapperData> ChildMapperDatas
-            => _childMapperDatas ?? (_childMapperDatas = new List<ObjectMapperData>());
+            => _childMapperDatas ??= new List<ObjectMapperData>();
 
         public IList<ObjectMapperData> ChildMapperDatasOrEmpty
             => _childMapperDatas ?? (IList<ObjectMapperData>)Enumerable<ObjectMapperData>.EmptyArray;
 
         public IList<ObjectMapperData> DerivedMapperDatas
-            => _derivedMapperDatas ?? (_derivedMapperDatas = new List<ObjectMapperData>());
+            => _derivedMapperDatas ??= new List<ObjectMapperData>();
 
         public int DataSourceIndex { get; set; }
 
@@ -398,7 +398,7 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
             }
         }
 
-        private bool TargetTypeHasBeenMappedBefore => !TargetTypeHasNotYetBeenMapped;
+        public bool TargetTypeHasBeenMappedBefore => !TargetTypeHasNotYetBeenMapped;
 
         public bool TargetTypeHasNotYetBeenMapped { get; }
 
@@ -413,8 +413,11 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
         public Expression GetReturnLabel(Expression defaultValue)
             => Expression.Label(ReturnLabelTarget, defaultValue);
 
+        public Expression GetReturnExpression(Expression value)
+            => Expression.Return(ReturnLabelTarget, value, TargetType);
+
         public ObjectMapperData EntryPointMapperData
-            => _entryPointMapperData ?? (_entryPointMapperData = GetNearestEntryPointObjectMapperData());
+            => _entryPointMapperData ??= GetNearestEntryPointObjectMapperData();
 
         private ObjectMapperData GetNearestEntryPointObjectMapperData()
         {
@@ -444,7 +447,7 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
 
         public void SetEntryPoint() => _isEntryPoint = true;
 
-        public bool IsRepeatMapping => (_isRepeatMapping ?? (_isRepeatMapping = this.IsRepeatMapping())).Value;
+        public bool IsRepeatMapping => (_isRepeatMapping ??= this.IsRepeatMapping());
 
         public void RegisterRepeatedMapperFunc(IObjectMappingData mappingData)
         {
@@ -482,7 +485,7 @@ namespace AgileObjects.AgileMapper.ObjectPopulation
         public IList<ObjectMapperKeyBase> RepeatedMapperFuncKeys { get; private set; }
 
         public Dictionary<QualifiedMember, IDataSourceSet> DataSourcesByTargetMember
-            => _dataSourcesByTargetMember ?? (_dataSourcesByTargetMember = new Dictionary<QualifiedMember, IDataSourceSet>());
+            => _dataSourcesByTargetMember ??= new Dictionary<QualifiedMember, IDataSourceSet>();
 
         public Expression GetRuntimeTypedMapping(
             Expression sourceObject,

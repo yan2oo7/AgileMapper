@@ -140,7 +140,7 @@
 
         public Expression GetCounterIncrement() => Expression.PreIncrementAssign(Counter);
 
-        public ParameterExpression Counter => _counterVariable ?? (_counterVariable = GetCounterVariable());
+        public ParameterExpression Counter => _counterVariable ??= GetCounterVariable();
 
         private ParameterExpression GetCounterVariable()
         {
@@ -273,27 +273,37 @@
             }
         }
 
-        public void AssignSourceVariableFromSourceObject()
+        public void AssignSourceVariableToSourceObject()
         {
             SourceValue = _sourceAdapter.GetSourceValues();
 
-            if ((SourceValue == MapperData.SourceObject) && MapperData.HasSameSourceAsParent())
+            if (SourceVariableAlreadyAssignedTo(SourceValue))
             {
                 CreateSourceTypeHelper(SourceValue);
                 return;
             }
 
-            AssignSourceVariableFrom(SourceValue);
+            AssignSourceVariableTo(SourceValue);
 
             var shortCircuit = _sourceAdapter.GetMappingShortCircuitOrNull();
 
             _populationExpressions.AddUnlessNullOrEmpty(shortCircuit);
         }
 
-        public void AssignSourceVariableFrom(Func<SourceItemsSelector, SourceItemsSelector> sourceItemsSelection)
-            => AssignSourceVariableFrom(sourceItemsSelection.Invoke(_sourceItemsSelector).GetResult());
+        private bool SourceVariableAlreadyAssignedTo(Expression value)
+        {
+            if (MapperData.Context.IsForToTargetMapping)
+            {
+                return false;
+            }
 
-        private void AssignSourceVariableFrom(Expression sourceValue)
+            return (value == MapperData.SourceObject) && MapperData.HasSameSourceAsParent();
+        }
+
+        public void AssignSourceVariableTo(Func<SourceItemsSelector, SourceItemsSelector> sourceItemsSelection)
+            => AssignSourceVariableTo(sourceItemsSelection.Invoke(_sourceItemsSelector).GetResult());
+
+        private void AssignSourceVariableTo(Expression sourceValue)
         {
             CreateSourceTypeHelper(sourceValue);
 
@@ -341,7 +351,7 @@
             if (TargetCouldBeUnusable())
             {
                 var targetVariableNull = TargetVariable.GetIsDefaultComparison();
-                var returnExistingValue = Expression.Return(MapperData.ReturnLabelTarget, MapperData.TargetObject);
+                var returnExistingValue = MapperData.GetReturnExpression(MapperData.TargetObject);
                 var ifNullReturn = Expression.IfThen(targetVariableNull, returnExistingValue);
 
                 _populationExpressions.Add(ifNullReturn);
@@ -430,7 +440,7 @@
             {
                 return GetNonNullDeclaredReadOnlyExistingTargetVariableValue();
             }
-            
+
             if (TargetTypeHelper.HasCollectionInterface && TargetTypeHelper.CouldBeReadOnly())
             {
                 return GetIfReadOnlyCollectionConditional(MapperData.TargetObject);
@@ -472,7 +482,7 @@
             var isReadOnlyProperty = TargetTypeHelper
                 .CollectionInterfaceType
                 .GetPublicInstanceProperty("IsReadOnly");
-            
+
             var collectionType = collection.Type;
             var ifReadOnlyValue = GetUnusableTargetValue(collectionType);
 
